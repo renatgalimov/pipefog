@@ -1,5 +1,5 @@
-use sha3::{Digest, Sha3_256};
 use serde_json::{Deserializer, Value};
+use sha3::{Digest, Sha3_256};
 use std::io::{self, Write};
 
 fn hash_strings(value: &mut Value) {
@@ -51,6 +51,31 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    const TEST_SAMPLE: &str = r#"
+        [
+          {
+            "id": "ehatv5afkscpijfhcdiwk2vgk5",
+            "title": "Title",
+            "version": 1,
+            "vault": {
+              "id": "ymmcavajzclbbyvnn6pmghw52n",
+              "name": "Vaultname"
+            },
+            "category": "LOGIN",
+            "last_edited_by": "LIS57PQOMZYK6YIAH6DN35JBCR",
+            "created_at": "2025-05-07T11:58:32Z",
+            "updated_at": "2025-05-07T11:58:32Z",
+            "additional_information": "—",
+            "urls": [
+              {
+                "label": "website",
+                "primary": true,
+                "href": "https://example.com/accounts/6d407c4c7578c31bdbe1dce529476c1a/signInPassword"
+              }
+            ]
+          }
+        ]"#;
+
     fn sha3_hex(input: &str) -> String {
         let mut hasher = Sha3_256::new();
         hasher.update(input.as_bytes());
@@ -71,5 +96,42 @@ mod tests {
         assert_eq!(value["b"][0], json!(sha3_hex("x")));
         assert_eq!(value["b"][1], json!(1));
         assert_eq!(value["c"]["d"], json!(sha3_hex("y")));
+    }
+
+    #[test]
+    fn test_hash_strings_test_sample() {
+        let test_sample: Value =
+            serde_json::from_str(TEST_SAMPLE).expect("Failed to parse TEST_SAMPLE");
+
+        let mut hashed_sample = test_sample.clone();
+        hash_strings(&mut hashed_sample);
+        let hashes = serde_json::to_string_pretty(&hashed_sample)
+            .expect("Failed to serialize hashed sample");
+
+        const EXPECTED_HASHES: &str = r#"[
+  {
+    "additional_information": "4e9be9f98ffaf00dfa6849b118ec0eebaeb9d1fedf49794efc978549d692a644",
+    "category": "137e3c8495f71ca7e1c165fd3873705cde985f43c13c516a471840f98d472cc6",
+    "created_at": "cf8cbca8ef96e021217ba62b3f9bc79b3358df6ffabf3036555eb093b6a03900",
+    "id": "88cf7ddaff83bfd6f3c9b2f8dfd90987628b01a689b04b0d6f4d6bc05e77c8db",
+    "last_edited_by": "972e64ff2f45cb894fd548bbdd0f7d430ba23400502ac9c650d4aa053360ca37",
+    "title": "884e4e4f1742800cbbbb1ffec554ebcd61e8b94cec27ca11efc017c9d582692e",
+    "updated_at": "cf8cbca8ef96e021217ba62b3f9bc79b3358df6ffabf3036555eb093b6a03900",
+    "urls": [
+      {
+        "href": "d0de71c6aff7c8a492c089fbd5a26a39e76716eef770728c5383386fc245c34b",
+        "label": "f4c0beb05567bed298d8e86439af9c64dbbb86e0804ce527992945db1f873bca",
+        "primary": true
+      }
+    ],
+    "vault": {
+      "id": "c3427b6423f76857e8ae40651586be4c8bda92ba9c10c201755cb474ea3236d0",
+      "name": "2a82dce0734a47938504d6b913fa6c0f05ccefdcc30c96e429f391178770020b"
+    },
+    "version": 1
+  }
+]"#;
+
+        assert_eq!(hashes, EXPECTED_HASHES);
     }
 }
