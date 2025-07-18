@@ -9,3 +9,7 @@ serde_json = "1.*"
 regex = "*"
 lazy_static = "1.*"
 hex = "0.4"
+
+[[bin]]
+name = "syllable_frequency"
+path = "src/bin/syllable_frequency.rs"
