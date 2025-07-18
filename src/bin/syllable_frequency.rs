@@ -55,8 +55,15 @@ fn count_syllables(text: &str) -> Vec<(String, usize)> {
 fn main() -> io::Result<()> {
     let mut input = String::new();
     io::stdin().read_to_string(&mut input)?;
+    let vowels = "aeiouyAEIOUY";
+
     for (syl, count) in count_syllables(&input) {
-        println!("{} {}", syl, count);
+        // Filter out syllables that do not contain vowels
+        if !syl.chars().any(|c| vowels.contains(c)) {
+            continue;
+        }
+
+        println!("{} {} {}", count, syl.len(), syl);
     }
     Ok(())
 }
