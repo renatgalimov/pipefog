@@ -1,4 +1,9 @@
-![image](https://github.com/user-attachments/assets/3cf550d5-3656-48b9-9a14-4fb893e80db7)
-
 # pipefog
-Stream-structured obfuscation for JSON/YAML
+
+This tool reads JSON values from standard input and writes them back with every string value replaced by its SHA3-256 hash. Input may consist of multiple JSON documents concatenated together. Each document is printed on a separate line using pretty formatting.
+
+## Usage
+
+```bash
+cat input.json | cargo run --release
+```
