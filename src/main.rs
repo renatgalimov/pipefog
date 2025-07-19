@@ -22,13 +22,49 @@ const SYLLABLES: &[&str] = &[
     "amb", "amm", "amp", "ams", "anb", "anc", "and", "ang", "ank", "ann",
 ];
 
+fn is_alpha_word(s: &str) -> bool {
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_lowercase())
+}
+
+fn hash_word_to_syllables(word: &str) -> String {
+    let mut hasher = Sha3_256::new();
+    hasher.update(word.as_bytes());
+    let hash = hasher.finalize();
+
+    let mut out = String::new();
+    for &b in hash.as_slice() {
+        out.push_str(SYLLABLES[b as usize]);
+    }
+
+    // Ensure the resulting word has the same length as the original
+    if out.len() >= word.len() {
+        out.truncate(word.len());
+    } else {
+        while out.len() < word.len() {
+            for &b in hash.as_slice() {
+                out.push_str(SYLLABLES[b as usize]);
+                if out.len() >= word.len() {
+                    break;
+                }
+            }
+        }
+        out.truncate(word.len());
+    }
+
+    out
+}
+
 fn hash_strings(value: &mut Value) {
     match value {
         Value::String(s) => {
-            let mut hasher = Sha3_256::new();
-            hasher.update(s.as_bytes());
-            let result = hasher.finalize();
-            *s = hex::encode(result);
+            if is_alpha_word(s) {
+                *s = hash_word_to_syllables(s);
+            } else {
+                let mut hasher = Sha3_256::new();
+                hasher.update(s.as_bytes());
+                let result = hasher.finalize();
+                *s = hex::encode(result);
+            }
         }
         Value::Array(arr) => {
             for v in arr.iter_mut() {
@@ -113,10 +149,28 @@ mod tests {
 
         hash_strings(&mut value);
 
-        assert_eq!(value["a"], json!(sha3_hex("test")));
-        assert_eq!(value["b"][0], json!(sha3_hex("x")));
+        assert_eq!(value["a"], json!("esal"));
+        assert_eq!(value["b"][0], json!("o"));
         assert_eq!(value["b"][1], json!(1));
-        assert_eq!(value["c"]["d"], json!(sha3_hex("y")));
+        assert_eq!(value["c"]["d"], json!("u"));
+    }
+
+    #[test]
+    fn test_word_obfuscation() {
+        let word = "secret";
+        assert!(is_alpha_word(word));
+        let obf = hash_word_to_syllables(word);
+        assert_eq!(obf.len(), word.len());
+        assert!(is_alpha_word(&obf));
+    }
+
+    #[test]
+    fn test_is_alpha_word_cases() {
+        assert!(!is_alpha_word("Word"));
+        assert!(is_alpha_word("word"));
+        assert!(!is_alpha_word("wo_rd"));
+        assert!(!is_alpha_word("wo-rd"));
+        assert!(!is_alpha_word("WORD"));
     }
 
     #[test]
@@ -136,12 +190,13 @@ mod tests {
     "created_at": "cf8cbca8ef96e021217ba62b3f9bc79b3358df6ffabf3036555eb093b6a03900",
     "id": "88cf7ddaff83bfd6f3c9b2f8dfd90987628b01a689b04b0d6f4d6bc05e77c8db",
     "last_edited_by": "972e64ff2f45cb894fd548bbdd0f7d430ba23400502ac9c650d4aa053360ca37",
+    "lower case word": "epagrfiovusso",
     "title": "884e4e4f1742800cbbbb1ffec554ebcd61e8b94cec27ca11efc017c9d582692e",
     "updated_at": "cf8cbca8ef96e021217ba62b3f9bc79b3358df6ffabf3036555eb093b6a03900",
     "urls": [
       {
         "href": "d0de71c6aff7c8a492c089fbd5a26a39e76716eef770728c5383386fc245c34b",
-        "label": "f4c0beb05567bed298d8e86439af9c64dbbb86e0804ce527992945db1f873bca",
+        "label": "altysyn",
         "primary": true
       }
     ],
