@@ -3,7 +3,7 @@ use sha3::{Digest, Sha3_256};
 use std::io::{self, Write};
 
 mod classifiers;
-use classifiers::{is_uppercase_word, obfuscate_uppercase_word};
+use classifiers::{obfuscate_uppercase_word, try_alpha_word, try_uppercase_word};
 
 const SYLLABLES: &[&str] = &[
     "a", "e", "i", "o", "u", "y", "ab", "ac", "ad", "af", "ag", "ah", "ak", "al", "am", "an", "ap",
@@ -25,9 +25,6 @@ const SYLLABLES: &[&str] = &[
     "amb", "amm", "amp", "ams", "anb", "anc", "and", "ang", "ank", "ann",
 ];
 
-fn is_alpha_word(s: &str) -> bool {
-    !s.is_empty() && s.chars().all(|c| c.is_ascii_lowercase())
-}
 
 fn hash_word_to_syllables(word: &str) -> String {
     let mut hasher = Sha3_256::new();
@@ -60,9 +57,9 @@ fn hash_word_to_syllables(word: &str) -> String {
 fn hash_strings(value: &mut Value) {
     match value {
         Value::String(s) => {
-            if is_alpha_word(s) {
+            if try_alpha_word(s).is_some() {
                 *s = hash_word_to_syllables(s);
-            } else if is_uppercase_word(Some(s)).is_some() {
+            } else if try_uppercase_word(s).is_some() {
                 *s = obfuscate_uppercase_word(s);
             } else {
                 let mut hasher = Sha3_256::new();
@@ -165,19 +162,19 @@ mod tests {
     #[test]
     fn test_word_obfuscation() {
         let word = "secret";
-        assert!(is_alpha_word(word));
+        assert!(try_alpha_word(word).is_some());
         let obf = hash_word_to_syllables(word);
         assert_eq!(obf.len(), word.len());
-        assert!(is_alpha_word(&obf));
+        assert!(try_alpha_word(&obf).is_some());
     }
 
     #[test]
-    fn test_is_alpha_word_cases() {
-        assert!(!is_alpha_word("Word"));
-        assert!(is_alpha_word("word"));
-        assert!(!is_alpha_word("wo_rd"));
-        assert!(!is_alpha_word("wo-rd"));
-        assert!(!is_alpha_word("WORD"));
+    fn test_try_alpha_word_cases() {
+        assert!(try_alpha_word("Word").is_none());
+        assert!(try_alpha_word("word").is_some());
+        assert!(try_alpha_word("wo_rd").is_none());
+        assert!(try_alpha_word("wo-rd").is_none());
+        assert!(try_alpha_word("WORD").is_none());
     }
 
     #[test]
