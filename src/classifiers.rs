@@ -35,6 +35,22 @@ pub fn is_uppercase_word(input: &str) -> bool {
     !input.is_empty() && input.chars().all(|c| c.is_ascii_uppercase())
 }
 
+/// Detects whether the provided string is a capitalized word where the first
+/// character is uppercase ASCII and the remaining characters are lowercase
+/// ASCII.
+pub fn is_capitalized_word(input: &str) -> bool {
+    if input.is_empty() {
+        return false;
+    }
+    let mut chars = input.chars();
+    match chars.next() {
+        Some(first) if first.is_ascii_uppercase() => {
+            chars.all(|c| c.is_ascii_lowercase())
+        }
+        _ => false,
+    }
+}
+
 /// Deterministically obfuscate a lowercase word into another lowercase word of
 /// the same length using a syllable table.
 pub fn hash_word_to_syllables(word: &str) -> String {
@@ -74,6 +90,22 @@ pub fn obfuscate_uppercase_word(word: &str) -> String {
     hashed.to_ascii_uppercase()
 }
 
+/// Obfuscate a capitalized word (first letter uppercase, rest lowercase) into
+/// another deterministic capitalized word of the same length. The output will
+/// also be recognised by `is_capitalized_word`.
+pub fn obfuscate_capitalized_word(word: &str) -> String {
+    let hashed = hash_word_to_syllables(&word.to_lowercase());
+    if hashed.is_empty() {
+        return hashed;
+    }
+    let mut chars = hashed.chars();
+    let first = chars.next().unwrap().to_ascii_uppercase();
+    let mut out = String::new();
+    out.push(first);
+    out.extend(chars);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,11 +129,30 @@ mod tests {
     }
 
     #[test]
+    fn test_is_capitalized_word_examples() {
+        assert!(is_capitalized_word("Test"));
+        assert!(!is_capitalized_word("test"));
+        assert!(!is_capitalized_word("tEST"));
+        assert!(!is_capitalized_word("Test Test"));
+        assert!(!is_capitalized_word("Test-udo"));
+        assert!(!is_capitalized_word("Test test"));
+        assert!(!is_capitalized_word("TEst"));
+    }
+
+    #[test]
     fn test_obfuscate_uppercase_word_preserves_class() {
         let word = "SECRET";
         let obf = obfuscate_uppercase_word(word);
         assert_eq!(obf.len(), word.len());
         assert!(is_uppercase_word(&obf));
+    }
+
+    #[test]
+    fn test_obfuscate_capitalized_word_preserves_class() {
+        let word = "Secret";
+        let obf = obfuscate_capitalized_word(word);
+        assert_eq!(obf.len(), word.len());
+        assert!(is_capitalized_word(&obf));
     }
 
     #[test]
