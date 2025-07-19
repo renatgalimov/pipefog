@@ -4,7 +4,8 @@ use std::io::{self, Write};
 
 mod classifiers;
 use classifiers::{
-    hash_word_to_syllables, is_alpha_word, is_uppercase_word, obfuscate_uppercase_word,
+    hash_word_to_syllables, is_alpha_word, is_uppercase_word, is_capitalized_word,
+    obfuscate_uppercase_word, obfuscate_capitalized_word,
 };
 
 fn hash_strings(value: &mut Value) {
@@ -14,6 +15,8 @@ fn hash_strings(value: &mut Value) {
                 *s = hash_word_to_syllables(s);
             } else if is_uppercase_word(s) {
                 *s = obfuscate_uppercase_word(s);
+            } else if is_capitalized_word(s) {
+                *s = obfuscate_capitalized_word(s);
             } else {
                 let mut hasher = Sha3_256::new();
                 hasher.update(s.as_bytes());
@@ -100,6 +103,7 @@ mod tests {
             "a": "test",
             "b": ["x", 1],
             "c": {"d": "y"},
+            "cap": "Word",
             "u": "UPPER"
         });
 
@@ -109,6 +113,7 @@ mod tests {
         assert_eq!(value["b"][0], json!("o"));
         assert_eq!(value["b"][1], json!(1));
         assert_eq!(value["c"]["d"], json!("u"));
+        assert_eq!(value["cap"], json!("Eqon"));
         assert_eq!(value["u"], json!("AHSON"));
     }
 
@@ -139,7 +144,7 @@ mod tests {
     "id": "88cf7ddaff83bfd6f3c9b2f8dfd90987628b01a689b04b0d6f4d6bc05e77c8db",
     "last_edited_by": "972e64ff2f45cb894fd548bbdd0f7d430ba23400502ac9c650d4aa053360ca37",
     "lower case word": "epagrfiovusso",
-    "title": "884e4e4f1742800cbbbb1ffec554ebcd61e8b94cec27ca11efc017c9d582692e",
+    "title": "Ylads",
     "updated_at": "cf8cbca8ef96e021217ba62b3f9bc79b3358df6ffabf3036555eb093b6a03900",
     "urls": [
       {
@@ -150,7 +155,7 @@ mod tests {
     ],
     "vault": {
       "id": "c3427b6423f76857e8ae40651586be4c8bda92ba9c10c201755cb474ea3236d0",
-      "name": "2a82dce0734a47938504d6b913fa6c0f05ccefdcc30c96e429f391178770020b"
+      "name": "Aknbedyip"
     },
     "version": 1
   }
