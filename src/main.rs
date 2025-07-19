@@ -4,11 +4,10 @@ use std::io::{self, Write};
 
 mod classifiers;
 use classifiers::{
-    hash_word_to_syllables, obfuscate_uppercase_word, is_alpha_word, is_uppercase_word,
+    hash_word_to_syllables, is_alpha_word, is_uppercase_word, obfuscate_uppercase_word,
 };
 
 fn hash_strings(value: &mut Value) {
-
     match value {
         Value::String(s) => {
             if is_alpha_word(s) {
@@ -110,7 +109,7 @@ mod tests {
         assert_eq!(value["b"][0], json!("o"));
         assert_eq!(value["b"][1], json!(1));
         assert_eq!(value["c"]["d"], json!("u"));
-        assert_eq!(value["u"], json!("XQEAM"));
+        assert_eq!(value["u"], json!("AHSON"));
     }
 
     #[test]
@@ -135,7 +134,7 @@ mod tests {
         const EXPECTED_HASHES: &str = r#"[
   {
     "additional_information": "4e9be9f98ffaf00dfa6849b118ec0eebaeb9d1fedf49794efc978549d692a644",
-    "category": "TWICT",
+    "category": "UMACL",
     "created_at": "cf8cbca8ef96e021217ba62b3f9bc79b3358df6ffabf3036555eb093b6a03900",
     "id": "88cf7ddaff83bfd6f3c9b2f8dfd90987628b01a689b04b0d6f4d6bc05e77c8db",
     "last_edited_by": "972e64ff2f45cb894fd548bbdd0f7d430ba23400502ac9c650d4aa053360ca37",
