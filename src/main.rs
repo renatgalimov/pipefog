@@ -3,58 +3,12 @@ use sha3::{Digest, Sha3_256};
 use std::io::{self, Write};
 
 mod classifiers;
-use classifiers::{obfuscate_uppercase_word, is_alpha_word, is_uppercase_word};
-
-const SYLLABLES: &[&str] = &[
-    "a", "e", "i", "o", "u", "y", "ab", "ac", "ad", "af", "ag", "ah", "ak", "al", "am", "an", "ap",
-    "aq", "ar", "as", "at", "av", "aw", "ax", "az", "ba", "be", "bi", "bo", "bu", "by", "ca", "ce",
-    "co", "cu", "da", "de", "di", "do", "du", "dy", "eb", "ec", "ed", "ef", "eg", "eh", "ek", "el",
-    "em", "en", "ep", "eq", "er", "es", "et", "ev", "ew", "ex", "ez", "fa", "fe", "fi", "fo", "fu",
-    "ga", "ge", "gi", "go", "gu", "ha", "he", "hi", "ho", "hu", "ib", "ic", "id", "if", "ig", "ih",
-    "ik", "il", "im", "in", "ip", "iq", "ir", "is", "it", "iv", "ix", "iz", "ja", "je", "jo", "ju",
-    "ka", "ke", "ko", "la", "le", "li", "lo", "lu", "ly", "ma", "me", "mi", "mo", "my", "na", "ne",
-    "no", "ob", "oc", "od", "of", "og", "oh", "ok", "ol", "om", "on", "op", "oq", "or", "os", "ot",
-    "ov", "ow", "ox", "oz", "pa", "pe", "pi", "po", "pu", "qu", "ra", "re", "ri", "ro", "ru", "sa",
-    "se", "si", "so", "su", "ta", "te", "ti", "to", "tu", "ub", "uc", "ud", "uf", "ug", "uh", "uk",
-    "ul", "um", "un", "up", "uq", "ur", "us", "ut", "uv", "uw", "ux", "uz", "va", "ve", "vi", "vo",
-    "wa", "we", "wi", "wo", "xi", "yb", "yc", "yd", "yf", "yg", "yh", "yl", "ym", "yn", "yr", "ys",
-    "yt", "yw", "yx", "yz", "ze", "zo", "abh", "abl", "abr", "abs", "acc", "ach", "ack", "acl",
-    "acq", "acr", "act", "add", "adf", "adh", "adj", "adm", "adr", "ads", "adt", "adv", "aff",
-    "afr", "aft", "agg", "agm", "agn", "agr", "ags", "ahs", "akf", "akn", "aks", "alb", "alc",
-    "ald", "alf", "alg", "alh", "alk", "all", "alm", "alp", "alq", "alr", "als", "alt", "alw",
-    "amb", "amm", "amp", "ams", "anb", "anc", "and", "ang", "ank", "ann",
-];
-
-
-fn hash_word_to_syllables(word: &str) -> String {
-    let mut hasher = Sha3_256::new();
-    hasher.update(word.as_bytes());
-    let hash = hasher.finalize();
-
-    let mut out = String::new();
-    for &b in hash.as_slice() {
-        out.push_str(SYLLABLES[b as usize]);
-    }
-
-    // Ensure the resulting word has the same length as the original
-    if out.len() >= word.len() {
-        out.truncate(word.len());
-    } else {
-        while out.len() < word.len() {
-            for &b in hash.as_slice() {
-                out.push_str(SYLLABLES[b as usize]);
-                if out.len() >= word.len() {
-                    break;
-                }
-            }
-        }
-        out.truncate(word.len());
-    }
-
-    out
-}
+use classifiers::{
+    hash_word_to_syllables, obfuscate_uppercase_word, is_alpha_word, is_uppercase_word,
+};
 
 fn hash_strings(value: &mut Value) {
+
     match value {
         Value::String(s) => {
             if is_alpha_word(s) {
@@ -157,15 +111,6 @@ mod tests {
         assert_eq!(value["b"][1], json!(1));
         assert_eq!(value["c"]["d"], json!("u"));
         assert_eq!(value["u"], json!("XQEAM"));
-    }
-
-    #[test]
-    fn test_word_obfuscation() {
-        let word = "secret";
-        assert!(is_alpha_word(word));
-        let obf = hash_word_to_syllables(word);
-        assert_eq!(obf.len(), word.len());
-        assert!(is_alpha_word(&obf));
     }
 
     #[test]
