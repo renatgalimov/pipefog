@@ -2,6 +2,9 @@ use serde_json::{Deserializer, Value};
 use sha3::{Digest, Sha3_256};
 use std::io::{self, Write};
 
+mod classifiers;
+use classifiers::{is_uppercase_word, obfuscate_uppercase_word};
+
 const SYLLABLES: &[&str] = &[
     "a", "e", "i", "o", "u", "y", "ab", "ac", "ad", "af", "ag", "ah", "ak", "al", "am", "an", "ap",
     "aq", "ar", "as", "at", "av", "aw", "ax", "az", "ba", "be", "bi", "bo", "bu", "by", "ca", "ce",
@@ -59,6 +62,8 @@ fn hash_strings(value: &mut Value) {
         Value::String(s) => {
             if is_alpha_word(s) {
                 *s = hash_word_to_syllables(s);
+            } else if is_uppercase_word(Some(s)).is_some() {
+                *s = obfuscate_uppercase_word(s);
             } else {
                 let mut hasher = Sha3_256::new();
                 hasher.update(s.as_bytes());
@@ -144,7 +149,8 @@ mod tests {
         let mut value = json!({
             "a": "test",
             "b": ["x", 1],
-            "c": {"d": "y"}
+            "c": {"d": "y"},
+            "u": "UPPER"
         });
 
         hash_strings(&mut value);
@@ -153,6 +159,7 @@ mod tests {
         assert_eq!(value["b"][0], json!("o"));
         assert_eq!(value["b"][1], json!(1));
         assert_eq!(value["c"]["d"], json!("u"));
+        assert_eq!(value["u"], json!("XQEAM"));
     }
 
     #[test]
@@ -186,7 +193,7 @@ mod tests {
         const EXPECTED_HASHES: &str = r#"[
   {
     "additional_information": "4e9be9f98ffaf00dfa6849b118ec0eebaeb9d1fedf49794efc978549d692a644",
-    "category": "137e3c8495f71ca7e1c165fd3873705cde985f43c13c516a471840f98d472cc6",
+    "category": "TWICT",
     "created_at": "cf8cbca8ef96e021217ba62b3f9bc79b3358df6ffabf3036555eb093b6a03900",
     "id": "88cf7ddaff83bfd6f3c9b2f8dfd90987628b01a689b04b0d6f4d6bc05e77c8db",
     "last_edited_by": "972e64ff2f45cb894fd548bbdd0f7d430ba23400502ac9c650d4aa053360ca37",
