@@ -16,12 +16,12 @@ cat secrets.json | jq . | pipefog | jq .
 
 ## ✨ Features
 
-🔐 Deterministic obfuscation – ID fields, usernames, and keys are hashed in a consistent format.
-🏷️ Shape-preserving – Keeps field order, numeric values, and categories untouched.
-🧩 Supports JSON and YAML – Auto-detects format or allow override with --format.
-🛠️ Composable CLI – Works seamlessly in pipelines with jq, yq, and other Unix tools.
+- 🔐 Deterministic obfuscation – ID fields, usernames, and keys are hashed in a consistent format.
+- 🏷️ Shape-preserving – Keeps field order, numeric values, and categories untouched.
+- 🧩 Supports JSON and YAML – Auto-detects format or allow override with --format.
+- 🛠️ Composable CLI – Works seamlessly in pipelines with jq, yq, and other Unix tools.
 
 Planned features:
 
-✅ Streaming-safe – Process large files through stdin/stdout with minimal memory usage.
-🗓️ Date-like transformation – Preserves valid ISO 8601 date format with safe offsets.
+- ✅ Streaming-safe – Process large files through stdin/stdout with minimal memory usage.
+- 🗓️ Date-like transformation – Preserves valid ISO 8601 date format with safe offsets.
