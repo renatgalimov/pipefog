@@ -1,9 +1,15 @@
+<img width="1280" height="640" alt="pipefog-social" src="https://github.com/user-attachments/assets/a210fa94-fe76-49c3-9b14-7d21bd2c4281" />
+
 # pipefog
 
-This tool reads JSON values from standard input and writes them back with every string value replaced by its SHA3-256 hash. Input may consist of multiple JSON documents concatenated together. Each document is printed on a separate line using pretty formatting.
+**pipefog** – Stream‑structured data obfuscator for JSON/YAML.
 
-## Usage
+🔒 Mask your sensitive data while preserving format and structure. Designed for CLI pipelines and integration with tools like `jq` and `yq`.
+
+---
+
+## 🚀 Example Usage
 
 ```bash
-cat input.json | cargo run --release
+cat secrets.json | jq . | pipefog | jq .
 ```
