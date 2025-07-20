@@ -5,7 +5,8 @@ use std::io::{self, Write};
 mod classifiers;
 use classifiers::{
     hash_word_to_syllables, is_alpha_word, is_uppercase_word, is_capitalized_word,
-    obfuscate_uppercase_word, obfuscate_capitalized_word,
+    is_snake_case_word, obfuscate_uppercase_word, obfuscate_capitalized_word,
+    obfuscate_snake_case_word,
 };
 
 fn hash_strings(value: &mut Value) {
@@ -13,6 +14,8 @@ fn hash_strings(value: &mut Value) {
         Value::String(s) => {
             if is_alpha_word(s) {
                 *s = hash_word_to_syllables(s);
+            } else if is_snake_case_word(s) {
+                *s = obfuscate_snake_case_word(s);
             } else if is_uppercase_word(s) {
                 *s = obfuscate_uppercase_word(s);
             } else if is_capitalized_word(s) {
@@ -71,6 +74,7 @@ mod tests {
             "id": "ehatv5afkscpijfhcdiwk2vgk5",
             "title": "Title",
             "lower case word": "lowercaseword",
+            "snake_case": "snake_case",
             "version": 1,
             "vault": {
               "id": "ymmcavajzclbbyvnn6pmghw52n",
@@ -144,6 +148,7 @@ mod tests {
     "id": "88cf7ddaff83bfd6f3c9b2f8dfd90987628b01a689b04b0d6f4d6bc05e77c8db",
     "last_edited_by": "972e64ff2f45cb894fd548bbdd0f7d430ba23400502ac9c650d4aa053360ca37",
     "lower case word": "epagrfiovusso",
+    "snake_case": "_snake_case_phrase_",
     "title": "Ylads",
     "updated_at": "cf8cbca8ef96e021217ba62b3f9bc79b3358df6ffabf3036555eb093b6a03900",
     "urls": [
