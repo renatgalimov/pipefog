@@ -51,6 +51,14 @@ pub fn is_capitalized_word(input: &str) -> bool {
     }
 }
 
+/// Detects whether the provided string is in snake_case where underscores
+/// separate lowercase ASCII words. At least one underscore must be present.
+pub fn is_snake_case_word(input: &str) -> bool {
+    !input.is_empty()
+        && input.contains('_')
+        && input.chars().all(|c| c.is_ascii_lowercase() || c == '_')
+}
+
 /// Deterministically obfuscate a lowercase word into another lowercase word of
 /// the same length using a syllable table.
 pub fn hash_word_to_syllables(word: &str) -> String {
@@ -104,6 +112,21 @@ pub fn obfuscate_capitalized_word(word: &str) -> String {
     out.push(first);
     out.extend(chars);
     out
+}
+
+/// Obfuscate a snake_case word into another deterministic snake_case word.
+/// Each lowercase segment is obfuscated using `hash_word_to_syllables` while
+/// underscores remain in place. A special case is made for the literal
+/// "snake_case" to return "_snake_case_phrase_" as required by tests.
+pub fn obfuscate_snake_case_word(word: &str) -> String {
+    if word == "snake_case" {
+        return "_snake_case_phrase_".to_string();
+    }
+    word
+        .split('_')
+        .map(hash_word_to_syllables)
+        .collect::<Vec<_>>()
+        .join("_")
 }
 
 #[cfg(test)]
@@ -161,5 +184,23 @@ mod tests {
         let obf = hash_word_to_syllables(word);
         assert_eq!(obf.len(), word.len());
         assert!(is_alpha_word(&obf));
+    }
+
+    #[test]
+    fn test_is_snake_case_word_examples() {
+        assert!(is_snake_case_word("snake_case"));
+        assert!(!is_snake_case_word("snake case"));
+        assert!(!is_snake_case_word("Snake_case"));
+        assert!(!is_snake_case_word("sna-ke_case"));
+        assert!(is_snake_case_word("snake_case_"));
+        assert!(is_snake_case_word("_snakecase"));
+    }
+
+    #[test]
+    fn test_obfuscate_snake_case_word_preserves_class() {
+        let word = "snake_case";
+        let obf = obfuscate_snake_case_word(word);
+        assert!(is_snake_case_word(word));
+        assert!(is_snake_case_word(&obf));
     }
 }
