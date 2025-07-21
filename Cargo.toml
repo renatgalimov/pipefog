@@ -10,6 +10,11 @@ regex = "*"
 lazy_static = "1.*"
 hex = "0.4"
 
+
 [[bin]]
 name = "syllable_frequency"
 path = "src/bin/syllable_frequency.rs"
+
+[[bin]]
+name = "humanise"
+path = "src/bin/humanise.rs"
