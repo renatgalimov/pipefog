@@ -4,8 +4,8 @@ use std::io::{self, Write};
 
 mod classifiers;
 use classifiers::{
-    hash_word_to_syllables, is_alpha_word, is_uppercase_word, is_capitalized_word,
-    obfuscate_uppercase_word, obfuscate_capitalized_word,
+    hash_word_to_syllables, is_alpha_word, is_capitalized_word, is_uppercase_word,
+    obfuscate_capitalized_word, obfuscate_uppercase_word,
 };
 
 fn hash_strings(value: &mut Value) {
@@ -91,12 +91,6 @@ mod tests {
           }
         ]"#;
 
-    fn sha3_hex(input: &str) -> String {
-        let mut hasher = Sha3_256::new();
-        hasher.update(input.as_bytes());
-        hex::encode(hasher.finalize())
-    }
-
     #[test]
     fn test_hash_strings_simple() {
         let mut value = json!({
@@ -109,12 +103,12 @@ mod tests {
 
         hash_strings(&mut value);
 
-        assert_eq!(value["a"], json!("esal"));
-        assert_eq!(value["b"][0], json!("o"));
+        assert_eq!(value["a"], json!("comi"));
+        assert_eq!(value["b"][0], json!("s"));
         assert_eq!(value["b"][1], json!(1));
-        assert_eq!(value["c"]["d"], json!("u"));
-        assert_eq!(value["cap"], json!("Eqon"));
-        assert_eq!(value["u"], json!("AHSON"));
+        assert_eq!(value["c"]["d"], json!("i"));
+        assert_eq!(value["cap"], json!("Than"));
+        assert_eq!(value["u"], json!("ELIKU"));
     }
 
     #[test]
@@ -139,23 +133,23 @@ mod tests {
         const EXPECTED_HASHES: &str = r#"[
   {
     "additional_information": "4e9be9f98ffaf00dfa6849b118ec0eebaeb9d1fedf49794efc978549d692a644",
-    "category": "UMACL",
+    "category": "MANNO",
     "created_at": "cf8cbca8ef96e021217ba62b3f9bc79b3358df6ffabf3036555eb093b6a03900",
     "id": "88cf7ddaff83bfd6f3c9b2f8dfd90987628b01a689b04b0d6f4d6bc05e77c8db",
     "last_edited_by": "972e64ff2f45cb894fd548bbdd0f7d430ba23400502ac9c650d4aa053360ca37",
-    "lower case word": "epagrfiovusso",
-    "title": "Ylads",
+    "lower case word": "vericthesneup",
+    "title": "Butfa",
     "updated_at": "cf8cbca8ef96e021217ba62b3f9bc79b3358df6ffabf3036555eb093b6a03900",
     "urls": [
       {
         "href": "d0de71c6aff7c8a492c089fbd5a26a39e76716eef770728c5383386fc245c34b",
-        "label": "altysyn",
+        "label": "enagwhi",
         "primary": true
       }
     ],
     "vault": {
       "id": "c3427b6423f76857e8ae40651586be4c8bda92ba9c10c201755cb474ea3236d0",
-      "name": "Aknbedyip"
+      "name": "Hedencont"
     },
     "version": 1
   }

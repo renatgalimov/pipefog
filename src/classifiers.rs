@@ -2,23 +2,25 @@ use sha3::{Digest, Sha3_256};
 
 /// Syllables used for obfuscating lowercase words.
 pub const SYLLABLES: &[&str] = &[
-    "a", "e", "i", "o", "u", "y", "ab", "ac", "ad", "af", "ag", "ah", "ak", "al", "am", "an", "ap",
-    "aq", "ar", "as", "at", "av", "aw", "ax", "az", "ba", "be", "bi", "bo", "bu", "by", "ca", "ce",
-    "co", "cu", "da", "de", "di", "do", "du", "dy", "eb", "ec", "ed", "ef", "eg", "eh", "ek", "el",
-    "em", "en", "ep", "eq", "er", "es", "et", "ev", "ew", "ex", "ez", "fa", "fe", "fi", "fo", "fu",
-    "ga", "ge", "gi", "go", "gu", "ha", "he", "hi", "ho", "hu", "ib", "ic", "id", "if", "ig", "ih",
-    "ik", "il", "im", "in", "ip", "iq", "ir", "is", "it", "iv", "ix", "iz", "ja", "je", "jo", "ju",
-    "ka", "ke", "ko", "la", "le", "li", "lo", "lu", "ly", "ma", "me", "mi", "mo", "my", "na", "ne",
-    "no", "ob", "oc", "od", "of", "og", "oh", "ok", "ol", "om", "on", "op", "oq", "or", "os", "ot",
-    "ov", "ow", "ox", "oz", "pa", "pe", "pi", "po", "pu", "qu", "ra", "re", "ri", "ro", "ru", "sa",
-    "se", "si", "so", "su", "ta", "te", "ti", "to", "tu", "ub", "uc", "ud", "uf", "ug", "uh", "uk",
-    "ul", "um", "un", "up", "uq", "ur", "us", "ut", "uv", "uw", "ux", "uz", "va", "ve", "vi", "vo",
-    "wa", "we", "wi", "wo", "xi", "yb", "yc", "yd", "yf", "yg", "yh", "yl", "ym", "yn", "yr", "ys",
-    "yt", "yw", "yx", "yz", "ze", "zo", "abh", "abl", "abr", "abs", "acc", "ach", "ack", "acl",
-    "acq", "acr", "act", "add", "adf", "adh", "adj", "adm", "adr", "ads", "adt", "adv", "aff",
-    "afr", "aft", "agg", "agm", "agn", "agr", "ags", "ahs", "akf", "akn", "aks", "alb", "alc",
-    "ald", "alf", "alg", "alh", "alk", "all", "alm", "alp", "alq", "alr", "als", "alt", "alw",
-    "amb", "amm", "amp", "ams", "anb", "anc", "and", "ang", "ank", "ann",
+    "plac", "most", "sam", "ke", "uth", "arl", "het", "giv", "fa", "first", "own", "li", "van",
+    "form", "pres", "ond", "men", "bef", "old", "agr", "must", "two", "ight", "mak", "cons", "nat",
+    "den", "rem", "inst", "eb", "itt", "iss", "tak", "ars", "ap", "app", "iz", "wher", "ec", "mad",
+    "cont", "pe", "such", "lik", "ung", "rec", "gen", "now", "how", "urs", "wa", "ver", "than",
+    "don", "com", "mo", "ught", "pa", "min", "vi", "comm", "sho", "thes", "ents", "then", "aft",
+    "fe", "ek", "ha", "ins", "ep", "ich", "acc", "elf", "ans", "can", "ass", "att", "ni", "ex",
+    "work", "par", "ef", "te", "part", "ho", "onl", "des", "vo", "tim", "ib", "lo", "has", "tho",
+    "proj", "ert", "gre", "ord", "off", "stat", "what", "ort", "der", "eg", "gut", "ach", "art",
+    "si", "ett", "ern", "als", "enb", "bo", "ud", "ys", "them", "som", "mor", "act", "unt", "who",
+    "ac", "ak", "ik", "ish", "ast", "when", "erg", "po", "ne", "ard", "will", "go", "ugh", "ro",
+    "um", "da", "ens", "ow", "ja", "my", "ind", "ok", "op", "wo", "anc", "ill", "abl", "ther",
+    "fo", "she", "av", "him", "ot", "oth", "ig", "ov", "its", "ell", "wer", "enc", "ma", "man",
+    "di", "od", "end", "do", "up", "re", "no", "im", "le", "ab", "om", "sa", "ul", "ant", "co",
+    "if", "uld", "ist", "hav", "ons", "la", "we", "from", "me", "had", "but", "her", "which", "so",
+    "ag", "int", "se", "est", "ol", "os", "qu", "un", "this", "ev", "ect", "ers", "iv", "em",
+    "not", "am", "by", "ess", "und", "ad", "il", "his", "ir", "all", "for", "was", "id", "de",
+    "with", "et", "that", "be", "ut", "ic", "us", "el", "ur", "he", "ent", "as", "or", "al", "ar",
+    "is", "an", "u", "ing", "at", "it", "es", "to", "and", "en", "on", "of", "ed", "o", "in", "er",
+    "i", "a", "y", "the", "e",
 ];
 
 /// Detects whether the provided string is composed entirely of ASCII lowercase
@@ -44,9 +46,7 @@ pub fn is_capitalized_word(input: &str) -> bool {
     }
     let mut chars = input.chars();
     match chars.next() {
-        Some(first) if first.is_ascii_uppercase() => {
-            chars.all(|c| c.is_ascii_lowercase())
-        }
+        Some(first) if first.is_ascii_uppercase() => chars.all(|c| c.is_ascii_lowercase()),
         _ => false,
     }
 }
