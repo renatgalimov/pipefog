@@ -1,3 +1,6 @@
+[![Rust Tests](https://github.com/renatgalimov/pipefog/actions/workflows/tests.yml/badge.svg)](https://github.com/renatgalimov/pipefog/actions/workflows/tests.yml)
+----
+
 <img width="1280" height="640" alt="pipefog-social" src="https://github.com/user-attachments/assets/a210fa94-fe76-49c3-9b14-7d21bd2c4281" />
 
 # pipefog
