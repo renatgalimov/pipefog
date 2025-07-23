@@ -68,6 +68,31 @@ pub fn is_snake_case_word(input: &str) -> bool {
     has_underscore
 }
 
+/// Detects whether the provided string is a sentence in Title Case. Each word
+/// must start with a capital letter followed by lowercase letters. Single-letter
+/// words must be uppercase.
+pub fn is_title_case_sentence(input: &str) -> bool {
+    if input.trim().is_empty() {
+        return false;
+    }
+    let mut word_count = 0;
+    for token in input.split_whitespace() {
+        let trimmed = token.trim_matches(|c: char| !c.is_ascii_alphabetic());
+        if trimmed.is_empty() {
+            return false;
+        }
+        if trimmed.chars().count() == 1 {
+            if !is_uppercase_word(trimmed) {
+                return false;
+            }
+        } else if !is_capitalized_word(trimmed) {
+            return false;
+        }
+        word_count += 1;
+    }
+    word_count > 1
+}
+
 /// Split a word into approximate English syllables using the same logic as the
 /// helper in `bin/syllable_frequency.rs`.
 fn rough_english_syllables(word: &str) -> Vec<String> {
@@ -209,9 +234,58 @@ pub fn obfuscate_snake_case_word(word: &str) -> String {
     out
 }
 
+/// Obfuscate a Title Case sentence by hashing the entire sentence and
+/// rebuilding each word from the hash. The resulting sentence will still be in
+/// Title Case.
+pub fn obfuscate_title_case_sentence(sentence: &str) -> String {
+    let mut hasher = Sha3_256::new();
+    hasher.update(sentence.as_bytes());
+    let hash = hasher.finalize();
+    let mut iter = hash.as_slice().iter().cycle();
+
+    let mut out_words = Vec::new();
+    for token in sentence.split_whitespace() {
+        let trimmed = token.trim_matches(|c: char| !c.is_ascii_alphabetic());
+        let start = token.find(trimmed).unwrap_or(0);
+        let end = start + trimmed.len();
+        let leading = &token[..start];
+        let trailing = &token[end..];
+        let mut word = String::new();
+        while word.len() < trimmed.len() {
+            if let Some(b) = iter.next() {
+                word.push_str(SYLLABLES[*b as usize]);
+            }
+        }
+        word.truncate(trimmed.len());
+        let word = if trimmed.chars().count() == 1 {
+            word.to_ascii_uppercase()
+        } else {
+            let mut chars = word.chars();
+            if let Some(first) = chars.next() {
+                let mut tmp = String::new();
+                tmp.push(first.to_ascii_uppercase());
+                tmp.extend(chars);
+                tmp
+            } else {
+                word
+            }
+        };
+        let mut rebuilt = String::new();
+        rebuilt.push_str(leading);
+        rebuilt.push_str(&word);
+        rebuilt.push_str(trailing);
+        out_words.push(rebuilt);
+    }
+
+    out_words.join(" ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
+
+    include!("../tests/well_known_inputs.rs");
 
     #[test]
     fn test_is_alpha_word_examples() {
@@ -281,5 +355,77 @@ mod tests {
         let word = "very_secret";
         let obf = obfuscate_snake_case_word(word);
         assert!(is_snake_case_word(&obf));
+    }
+
+    #[test]
+    fn test_is_title_case_sentence_examples() {
+        assert!(is_title_case_sentence("A Title Case Sentence"));
+        assert!(!is_title_case_sentence("A title Case Sentence"));
+        assert!(!is_title_case_sentence("A Title Case sentence"));
+        assert!(!is_title_case_sentence("Capitalized"));
+    }
+
+    #[test]
+    fn test_obfuscate_title_case_sentence_preserves_class() {
+        let sentence = "A Title Case Sentence";
+        let obf = obfuscate_title_case_sentence(sentence);
+        assert!(is_title_case_sentence(&obf));
+    }
+
+    #[test]
+    fn test_title_case_sentence_with_many_words() {
+        let sentence = "An Example Of A Very Long Title Case Sentence That Contains Many Words And Continues For Quite Some Time Without Losing The Required Capitalization Pattern";
+        assert!(is_title_case_sentence(sentence));
+        let obf = obfuscate_title_case_sentence(sentence);
+        assert!(is_title_case_sentence(&obf));
+    }
+
+    #[test]
+    fn test_well_known_inputs_detection() {
+        for example in WELL_KNOWN_INPUTS {
+            let mut detected = BTreeSet::new();
+            if is_alpha_word(example.input) {
+                detected.insert("alpha_word");
+            }
+            if is_uppercase_word(example.input) {
+                detected.insert("uppercase_word");
+            }
+            if is_capitalized_word(example.input) {
+                detected.insert("capitalized_word");
+            }
+            if is_snake_case_word(example.input) {
+                detected.insert("snake_case_word");
+            }
+            if is_title_case_sentence(example.input) {
+                detected.insert("title_case_sentence");
+            }
+            let expected: BTreeSet<&str> = example.detectors.iter().copied().collect();
+            assert_eq!(detected, expected, "mismatch for input: {}", example.input);
+        }
+    }
+
+    #[test]
+    fn test_well_known_inputs_obfuscation() {
+        for example in WELL_KNOWN_INPUTS {
+            for &name in example.detectors {
+                let obf = match name {
+                    "alpha_word" => hash_word_to_syllables(example.input),
+                    "uppercase_word" => obfuscate_uppercase_word(example.input),
+                    "capitalized_word" => obfuscate_capitalized_word(example.input),
+                    "snake_case_word" => obfuscate_snake_case_word(example.input),
+                    "title_case_sentence" => obfuscate_title_case_sentence(example.input),
+                    _ => continue,
+                };
+                let valid = match name {
+                    "alpha_word" => is_alpha_word(&obf),
+                    "uppercase_word" => is_uppercase_word(&obf),
+                    "capitalized_word" => is_capitalized_word(&obf),
+                    "snake_case_word" => is_snake_case_word(&obf),
+                    "title_case_sentence" => is_title_case_sentence(&obf),
+                    _ => false,
+                };
+                assert!(valid, "{} obfuscation failed for {}", name, example.input);
+            }
+        }
     }
 }
