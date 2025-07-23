@@ -4,8 +4,9 @@ use std::io::{self, Write};
 
 mod classifiers;
 use classifiers::{
-    hash_word_to_syllables, is_alpha_word, is_capitalized_word, is_uppercase_word,
-    obfuscate_capitalized_word, obfuscate_uppercase_word,
+    hash_word_to_syllables, is_alpha_word, is_capitalized_word, is_snake_case_word,
+    is_uppercase_word, obfuscate_capitalized_word, obfuscate_snake_case_word,
+    obfuscate_uppercase_word,
 };
 
 fn hash_strings(value: &mut Value) {
@@ -13,6 +14,8 @@ fn hash_strings(value: &mut Value) {
         Value::String(s) => {
             if is_alpha_word(s) {
                 *s = hash_word_to_syllables(s);
+            } else if is_snake_case_word(s) {
+                *s = obfuscate_snake_case_word(s);
             } else if is_uppercase_word(s) {
                 *s = obfuscate_uppercase_word(s);
             } else if is_capitalized_word(s) {
@@ -97,6 +100,7 @@ mod tests {
             "a": "test",
             "b": ["x", 1],
             "c": {"d": "y"},
+            "snake": "snake_case",
             "cap": "Word",
             "u": "UPPER"
         });
@@ -108,6 +112,7 @@ mod tests {
         assert_eq!(value["b"][1], json!(1));
         assert_eq!(value["c"]["d"], json!("i"));
         assert_eq!(value["cap"], json!("Than"));
+        assert_eq!(value["snake"], json!("utcont_stathim"));
         assert_eq!(value["u"], json!("ELIKU"));
     }
 
