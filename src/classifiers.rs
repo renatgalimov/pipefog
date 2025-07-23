@@ -51,6 +51,55 @@ pub fn is_capitalized_word(input: &str) -> bool {
     }
 }
 
+/// Detects whether the provided string is snake_case consisting of ASCII
+/// lowercase letters and underscores with at least one underscore.
+pub fn is_snake_case_word(input: &str) -> bool {
+    if input.is_empty() {
+        return false;
+    }
+    let mut has_underscore = false;
+    for c in input.chars() {
+        if c == '_' {
+            has_underscore = true;
+        } else if !c.is_ascii_lowercase() {
+            return false;
+        }
+    }
+    has_underscore
+}
+
+/// Split a word into approximate English syllables using the same logic as the
+/// helper in `bin/syllable_frequency.rs`.
+fn rough_english_syllables(word: &str) -> Vec<String> {
+    let mut syllables = Vec::new();
+    let mut buffer = String::new();
+    let chars: Vec<char> = word.chars().collect();
+    let vowels = "aeiouy";
+
+    let mut i = 0;
+    while i < chars.len() {
+        buffer.push(chars[i]);
+
+        if vowels.contains(chars[i]) {
+            let mut j = i + 1;
+            while j < chars.len() && !vowels.contains(chars[j]) {
+                buffer.push(chars[j]);
+                j += 1;
+            }
+            syllables.push(std::mem::take(&mut buffer));
+            i = j;
+        } else {
+            i += 1;
+        }
+    }
+
+    if !buffer.is_empty() {
+        syllables.push(buffer);
+    }
+
+    syllables
+}
+
 /// Deterministically obfuscate a lowercase word into another lowercase word of
 /// the same length using a syllable table.
 pub fn hash_word_to_syllables(word: &str) -> String {
@@ -80,6 +129,24 @@ pub fn hash_word_to_syllables(word: &str) -> String {
     out
 }
 
+/// Produce a deterministic vector of syllables for a word using the same
+/// hashing mechanism as `hash_word_to_syllables`. The returned vector will
+/// contain `count` syllables, repeating the hash output if necessary.
+pub fn hash_word_to_syllable_vec(word: &str, count: usize) -> Vec<&'static str> {
+    let mut hasher = Sha3_256::new();
+    hasher.update(word.as_bytes());
+    let hash = hasher.finalize();
+
+    let mut out = Vec::with_capacity(count);
+    let mut iter = hash.as_slice().iter().cycle();
+    for _ in 0..count {
+        if let Some(b) = iter.next() {
+            out.push(SYLLABLES[*b as usize]);
+        }
+    }
+    out
+}
+
 /// Obfuscate an uppercase word into another deterministic uppercase word of the
 /// same length. The output will also be recognised by `is_uppercase_word`.
 pub fn obfuscate_uppercase_word(word: &str) -> String {
@@ -103,6 +170,42 @@ pub fn obfuscate_capitalized_word(word: &str) -> String {
     let mut out = String::new();
     out.push(first);
     out.extend(chars);
+    out
+}
+
+/// Obfuscate a snake_case word by hashing all characters except underscores.
+/// The hashed syllables are combined in pairs and an underscore is inserted
+/// between each pair. Leading and trailing underscores from the input are
+/// preserved. The resulting string will still satisfy `is_snake_case_word`.
+pub fn obfuscate_snake_case_word(word: &str) -> String {
+    let leading = word.chars().take_while(|&c| c == '_').count();
+    let trailing = word.chars().rev().take_while(|&c| c == '_').count();
+
+    let letters: String = word.chars().filter(|&c| c != '_').collect();
+    // Use the full word for hashing so that underscore positions affect the
+    // result. Determine the number of output syllables based on a simple
+    // English syllable split of the letters-only portion.
+    let syllable_count = rough_english_syllables(&letters).len();
+    let syllables = hash_word_to_syllable_vec(word, syllable_count);
+
+    let mut parts = Vec::new();
+    let mut i = 0;
+    while i < syllables.len() {
+        let mut part = String::new();
+        part.push_str(syllables[i]);
+        if i + 1 < syllables.len() {
+            part.push_str(syllables[i + 1]);
+        }
+        parts.push(part);
+        i += 2;
+    }
+
+    let core = parts.join("_");
+
+    let mut out = String::new();
+    out.extend(std::iter::repeat('_').take(leading));
+    out.push_str(&core);
+    out.extend(std::iter::repeat('_').take(trailing));
     out
 }
 
@@ -161,5 +264,22 @@ mod tests {
         let obf = hash_word_to_syllables(word);
         assert_eq!(obf.len(), word.len());
         assert!(is_alpha_word(&obf));
+    }
+
+    #[test]
+    fn test_is_snake_case_word_examples() {
+        assert!(is_snake_case_word("snake_case"));
+        assert!(!is_snake_case_word("snake case"));
+        assert!(!is_snake_case_word("Snake_case"));
+        assert!(!is_snake_case_word("sna-ke_case"));
+        assert!(is_snake_case_word("snake_case_"));
+        assert!(is_snake_case_word("_snakecase"));
+    }
+
+    #[test]
+    fn test_obfuscate_snake_case_word_preserves_class() {
+        let word = "very_secret";
+        let obf = obfuscate_snake_case_word(word);
+        assert!(is_snake_case_word(&obf));
     }
 }
