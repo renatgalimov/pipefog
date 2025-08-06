@@ -23,8 +23,13 @@ cat secrets.json | jq . | pipefog | jq .
 - 🏷️ Shape-preserving – Keeps field order, numeric values, and categories untouched.
 - 🧩 Supports JSON and YAML – Auto-detects format or allow override with --format.
 - 🛠️ Composable CLI – Works seamlessly in pipelines with jq, yq, and other Unix tools.
+- 🗓️ ISO 8601 datetime obfuscation – Shifts dates relative to runtime baselines while preserving format.
+
+`pipefog` detects datetimes in the `YYYY-MM-DDTHH:MM:SSZ` form. A random baseline between
+1970-01-01 and the current date is chosen at startup. The first encountered datetime sets an
+original baseline. Every subsequent datetime is shifted relative to these baselines so the output
+remains a valid ISO 8601 `Z` datetime while preserving relative differences.
 
 Planned features:
 
 - ✅ Streaming-safe – Process large files through stdin/stdout with minimal memory usage.
-- 🗓️ Date-like transformation – Preserves valid ISO 8601 date format with safe offsets.

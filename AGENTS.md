@@ -6,6 +6,14 @@ This repository may include multiple string classifier functions. When adding a 
 2. **Write a unit test.** Each classifier requires a unit test showing that a sample string matches (or does not match) the classifier, the test should check that the obfuscated text also matches the same classifier. Tests can live in the same file under a `#[cfg(test)]` module or in another test module. 
 3. **Run tests.** After implementing or modifying classifiers, run `cargo test` to ensure all tests pass.
 
+### Testing Style
+
+Whenever possible, unit tests should compare against verbatim, human‑readable
+strings. Avoid reconstructing expected values through piecemeal assertions or
+templates—full text blocks make it clear how functionality changes. If a
+classifier introduces nondeterminism, provide a way for tests to fix the
+baseline so that direct string comparisons remain feasible.
+
 ### Well-known Examples
 
 Maintain a list of sample inputs for every classifier under `tests/well_known_inputs.rs`.

@@ -1,4 +1,8 @@
 use sha3::{Digest, Sha3_256};
+use chrono::{DateTime, TimeZone, Utc};
+use lazy_static::lazy_static;
+use rand::Rng;
+use std::sync::Mutex;
 
 /// Syllables used for obfuscating lowercase words.
 pub const SYLLABLES: &[&str] = &[
@@ -280,12 +284,80 @@ pub fn obfuscate_title_case_sentence(sentence: &str) -> String {
     out_words.join(" ")
 }
 
+fn random_date_between_1970_and_now() -> DateTime<Utc> {
+    let end = Utc::now().timestamp();
+    let mut rng = rand::thread_rng();
+    let secs = rng.gen_range(0..=end);
+    Utc.timestamp_opt(secs, 0).single().unwrap()
+}
+
+lazy_static! {
+    static ref NEW_DATE_BASELINE: Mutex<DateTime<Utc>> =
+        Mutex::new(random_date_between_1970_and_now());
+    static ref ORIGINAL_DATE_BASELINE: Mutex<Option<DateTime<Utc>>> = Mutex::new(None);
+}
+
+#[cfg(test)]
+lazy_static! {
+    pub static ref DATE_TEST_GUARD: Mutex<()> = Mutex::new(());
+}
+
+#[cfg(test)]
+pub fn set_date_baselines(new_base: DateTime<Utc>) {
+    let mut new_lock = NEW_DATE_BASELINE.lock().unwrap();
+    *new_lock = new_base;
+    let mut orig_lock = ORIGINAL_DATE_BASELINE.lock().unwrap();
+    *orig_lock = None;
+}
+
+/// Detects whether the provided string is an ISO 8601 datetime with a trailing
+/// `Z` designator.
+pub fn is_iso8601_z_datetime(input: &str) -> bool {
+    if let Ok(dt) = DateTime::parse_from_rfc3339(input) {
+        if input.ends_with('Z') {
+            dt.with_timezone(&Utc)
+                .format("%Y-%m-%dT%H:%M:%SZ")
+                .to_string()
+                == input
+        } else {
+            false
+        }
+    } else {
+        false
+    }
+}
+
+/// Obfuscate an ISO 8601 `Z` datetime by shifting it relative to runtime
+/// baselines. The resulting value remains a valid ISO 8601 `Z` datetime.
+pub fn obfuscate_iso8601_z_datetime(input: &str) -> String {
+    let dt = DateTime::parse_from_rfc3339(input)
+        .expect("invalid datetime")
+        .with_timezone(&Utc);
+    let mut orig = ORIGINAL_DATE_BASELINE.lock().unwrap();
+    let orig_dt = match *orig {
+        Some(ref orig_dt) => orig_dt.clone(),
+        None => {
+            *orig = Some(dt);
+            dt
+        }
+    };
+    let delta = orig_dt - dt;
+    let new_dt_base = NEW_DATE_BASELINE.lock().unwrap().clone();
+    let new_dt = new_dt_base + delta;
+    new_dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+    use chrono::{TimeZone, Utc};
 
     include!("../tests/well_known_inputs.rs");
+
+    fn reset_date_baselines() {
+        super::set_date_baselines(Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap());
+    }
 
     #[test]
     fn test_is_alpha_word_examples() {
@@ -399,6 +471,9 @@ mod tests {
             if is_title_case_sentence(example.input) {
                 detected.insert("title_case_sentence");
             }
+            if is_iso8601_z_datetime(example.input) {
+                detected.insert("iso8601_z_datetime");
+            }
             let expected: BTreeSet<&str> = example.detectors.iter().copied().collect();
             assert_eq!(detected, expected, "mismatch for input: {}", example.input);
         }
@@ -406,6 +481,8 @@ mod tests {
 
     #[test]
     fn test_well_known_inputs_obfuscation() {
+        let _guard = super::DATE_TEST_GUARD.lock().unwrap();
+        reset_date_baselines();
         for example in WELL_KNOWN_INPUTS {
             for &name in example.detectors {
                 let obf = match name {
@@ -414,6 +491,7 @@ mod tests {
                     "capitalized_word" => obfuscate_capitalized_word(example.input),
                     "snake_case_word" => obfuscate_snake_case_word(example.input),
                     "title_case_sentence" => obfuscate_title_case_sentence(example.input),
+                    "iso8601_z_datetime" => obfuscate_iso8601_z_datetime(example.input),
                     _ => continue,
                 };
                 let valid = match name {
@@ -422,10 +500,45 @@ mod tests {
                     "capitalized_word" => is_capitalized_word(&obf),
                     "snake_case_word" => is_snake_case_word(&obf),
                     "title_case_sentence" => is_title_case_sentence(&obf),
+                    "iso8601_z_datetime" => is_iso8601_z_datetime(&obf),
                     _ => false,
                 };
                 assert!(valid, "{} obfuscation failed for {}", name, example.input);
             }
         }
+    }
+
+    #[test]
+    fn test_is_iso8601_z_datetime_examples() {
+        assert!(is_iso8601_z_datetime("2022-05-16T22:39:20Z"));
+        assert!(!is_iso8601_z_datetime("2022-05-16T22:39:20+02:00"));
+        assert!(!is_iso8601_z_datetime("2022-05-16"));
+        assert!(!is_iso8601_z_datetime("not-a-date"));
+    }
+
+    #[test]
+    fn test_obfuscate_iso8601_z_datetime_preserves_class() {
+        let _guard = super::DATE_TEST_GUARD.lock().unwrap();
+        reset_date_baselines();
+        let first = "2022-05-16T22:39:20Z";
+        let second = "2022-05-15T22:39:20Z";
+        let obf_first = obfuscate_iso8601_z_datetime(first);
+        let obf_second = obfuscate_iso8601_z_datetime(second);
+        assert!(is_iso8601_z_datetime(&obf_first));
+        assert!(is_iso8601_z_datetime(&obf_second));
+        let obf_first_dt = chrono::DateTime::parse_from_rfc3339(&obf_first)
+            .unwrap()
+            .with_timezone(&Utc);
+        let obf_second_dt = chrono::DateTime::parse_from_rfc3339(&obf_second)
+            .unwrap()
+            .with_timezone(&Utc);
+        let first_dt = chrono::DateTime::parse_from_rfc3339(first)
+            .unwrap()
+            .with_timezone(&Utc);
+        let second_dt = chrono::DateTime::parse_from_rfc3339(second)
+            .unwrap()
+            .with_timezone(&Utc);
+        assert_eq!(obf_first_dt, *NEW_DATE_BASELINE.lock().unwrap());
+        assert_eq!(obf_second_dt - obf_first_dt, first_dt - second_dt);
     }
 }
