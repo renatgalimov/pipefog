@@ -24,4 +24,8 @@ pub const WELL_KNOWN_INPUTS: &[Example] = &[
         input: "A Title Case Sentence",
         detectors: &["title_case_sentence"],
     },
+    Example {
+        input: "2022-05-16T22:39:20Z",
+        detectors: &["iso8601_z_datetime"],
+    },
 ];

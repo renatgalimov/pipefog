@@ -4,9 +4,9 @@ use std::io::{self, Write};
 
 mod classifiers;
 use classifiers::{
-    hash_word_to_syllables, is_alpha_word, is_capitalized_word, is_snake_case_word,
-    is_uppercase_word, obfuscate_capitalized_word, obfuscate_snake_case_word,
-    obfuscate_uppercase_word,
+    hash_word_to_syllables, is_alpha_word, is_capitalized_word, is_iso8601_z_datetime,
+    is_snake_case_word, is_uppercase_word, obfuscate_capitalized_word,
+    obfuscate_iso8601_z_datetime, obfuscate_snake_case_word, obfuscate_uppercase_word,
 };
 
 fn hash_strings(value: &mut Value) {
@@ -20,6 +20,8 @@ fn hash_strings(value: &mut Value) {
                 *s = obfuscate_uppercase_word(s);
             } else if is_capitalized_word(s) {
                 *s = obfuscate_capitalized_word(s);
+            } else if is_iso8601_z_datetime(s) {
+                *s = obfuscate_iso8601_z_datetime(s);
             } else {
                 let mut hasher = Sha3_256::new();
                 hasher.update(s.as_bytes());
@@ -67,6 +69,8 @@ fn main() {
 mod tests {
     use super::*;
     use serde_json::json;
+    use chrono::{TimeZone, Utc};
+    use crate::classifiers::{set_date_baselines, DATE_TEST_GUARD};
 
     const TEST_SAMPLE: &str = r#"
         [
@@ -127,11 +131,15 @@ mod tests {
 
     #[test]
     fn test_hash_strings_test_sample() {
+        let _guard = DATE_TEST_GUARD.lock().unwrap();
+        set_date_baselines(Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap());
+
         let test_sample: Value =
             serde_json::from_str(TEST_SAMPLE).expect("Failed to parse TEST_SAMPLE");
 
         let mut hashed_sample = test_sample.clone();
         hash_strings(&mut hashed_sample);
+
         let hashes = serde_json::to_string_pretty(&hashed_sample)
             .expect("Failed to serialize hashed sample");
 
@@ -139,12 +147,12 @@ mod tests {
   {
     "additional_information": "4e9be9f98ffaf00dfa6849b118ec0eebaeb9d1fedf49794efc978549d692a644",
     "category": "MANNO",
-    "created_at": "cf8cbca8ef96e021217ba62b3f9bc79b3358df6ffabf3036555eb093b6a03900",
+    "created_at": "2000-01-01T00:00:00Z",
     "id": "88cf7ddaff83bfd6f3c9b2f8dfd90987628b01a689b04b0d6f4d6bc05e77c8db",
     "last_edited_by": "972e64ff2f45cb894fd548bbdd0f7d430ba23400502ac9c650d4aa053360ca37",
     "lower case word": "vericthesneup",
     "title": "Butfa",
-    "updated_at": "cf8cbca8ef96e021217ba62b3f9bc79b3358df6ffabf3036555eb093b6a03900",
+    "updated_at": "2000-01-01T00:00:00Z",
     "urls": [
       {
         "href": "d0de71c6aff7c8a492c089fbd5a26a39e76716eef770728c5383386fc245c34b",
@@ -161,5 +169,12 @@ mod tests {
 ]"#;
 
         assert_eq!(hashes, EXPECTED_HASHES);
+
+        let obj = hashed_sample.as_array().unwrap()[0].as_object().unwrap();
+        let created = obj.get("created_at").unwrap().as_str().unwrap();
+        assert!(is_iso8601_z_datetime(created));
+        let updated = obj.get("updated_at").unwrap().as_str().unwrap();
+        assert!(is_iso8601_z_datetime(updated));
+        assert_eq!(created, updated);
     }
 }
