@@ -28,4 +28,8 @@ pub const WELL_KNOWN_INPUTS: &[Example] = &[
         input: "2022-05-16T22:39:20Z",
         detectors: &["iso8601_z_datetime"],
     },
+    Example {
+        input: "mfrggzdfmztwq2lknnwg23tp",
+        detectors: &["base32_lowercase"],
+    },
 ];

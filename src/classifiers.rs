@@ -3,6 +3,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use lazy_static::lazy_static;
 use rand::Rng;
 use std::sync::Mutex;
+use data_encoding::BASE32_NOPAD;
 
 /// Syllables used for obfuscating lowercase words.
 pub const SYLLABLES: &[&str] = &[
@@ -95,6 +96,13 @@ pub fn is_title_case_sentence(input: &str) -> bool {
         word_count += 1;
     }
     word_count > 1
+}
+
+/// Detects whether the provided string is a lowercase Base32 value. The
+/// string must consist only of the characters `a`-`z` and `2`-`7` and have a
+/// length greater than 16 characters.
+pub fn is_base32_lowercase(input: &str) -> bool {
+    input.len() > 16 && input.chars().all(|c| matches!(c, 'a'..='z' | '2'..='7'))
 }
 
 /// Split a word into approximate English syllables using the same logic as the
@@ -284,6 +292,29 @@ pub fn obfuscate_title_case_sentence(sentence: &str) -> String {
     out_words.join(" ")
 }
 
+/// Obfuscate a lowercase Base32 string by hashing it with SHA3-256 and encoding
+/// the hash using lowercase Base32 without padding. The resulting string is
+/// truncated or repeated so that its length matches the input.
+pub fn obfuscate_base32_lowercase(input: &str) -> String {
+    let mut hasher = Sha3_256::new();
+    hasher.update(input.as_bytes());
+    let hash = hasher.finalize();
+
+    let encoded = BASE32_NOPAD.encode(hash.as_ref()).to_lowercase();
+    if encoded.len() >= input.len() {
+        encoded[..input.len()].to_string()
+    } else {
+        let mut out = String::with_capacity(input.len());
+        let mut iter = encoded.chars().cycle();
+        while out.len() < input.len() {
+            if let Some(ch) = iter.next() {
+                out.push(ch);
+            }
+        }
+        out
+    }
+}
+
 fn random_date_between_1970_and_now() -> DateTime<Utc> {
     let end = Utc::now().timestamp();
     let mut rng = rand::thread_rng();
@@ -453,6 +484,22 @@ mod tests {
     }
 
     #[test]
+    fn test_is_base32_lowercase_examples() {
+        assert!(is_base32_lowercase("mfrggzdfmztwq2lknnwg23tp"));
+        assert!(!is_base32_lowercase("mfrggzdfmztwq2lk"));
+        assert!(!is_base32_lowercase("MFRGGZDFMZTWQ2LKNNWG23TP"));
+        assert!(!is_base32_lowercase("mfrggzdfmztwq2lk!!"));
+    }
+
+    #[test]
+    fn test_obfuscate_base32_lowercase_preserves_class() {
+        let value = "mfrggzdfmztwq2lknnwg23tp";
+        let obf = obfuscate_base32_lowercase(value);
+        assert!(is_base32_lowercase(&obf));
+        assert_eq!(obf.len(), value.len());
+    }
+
+    #[test]
     fn test_well_known_inputs_detection() {
         for example in WELL_KNOWN_INPUTS {
             let mut detected = BTreeSet::new();
@@ -474,6 +521,9 @@ mod tests {
             if is_iso8601_z_datetime(example.input) {
                 detected.insert("iso8601_z_datetime");
             }
+            if is_base32_lowercase(example.input) {
+                detected.insert("base32_lowercase");
+            }
             let expected: BTreeSet<&str> = example.detectors.iter().copied().collect();
             assert_eq!(detected, expected, "mismatch for input: {}", example.input);
         }
@@ -492,6 +542,7 @@ mod tests {
                     "snake_case_word" => obfuscate_snake_case_word(example.input),
                     "title_case_sentence" => obfuscate_title_case_sentence(example.input),
                     "iso8601_z_datetime" => obfuscate_iso8601_z_datetime(example.input),
+                    "base32_lowercase" => obfuscate_base32_lowercase(example.input),
                     _ => continue,
                 };
                 let valid = match name {
@@ -501,6 +552,7 @@ mod tests {
                     "snake_case_word" => is_snake_case_word(&obf),
                     "title_case_sentence" => is_title_case_sentence(&obf),
                     "iso8601_z_datetime" => is_iso8601_z_datetime(&obf),
+                    "base32_lowercase" => is_base32_lowercase(&obf),
                     _ => false,
                 };
                 assert!(valid, "{} obfuscation failed for {}", name, example.input);
