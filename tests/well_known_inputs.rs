@@ -32,4 +32,8 @@ pub const WELL_KNOWN_INPUTS: &[Example] = &[
         input: "mfrggzdfmztwq2lknnwg23tp",
         detectors: &["base32_lowercase"],
     },
+    Example {
+        input: "MFRGGZDFMZTWQ2LKNNWG23TP",
+        detectors: &["base32_uppercase"],
+    },
 ];

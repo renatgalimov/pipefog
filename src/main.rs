@@ -4,9 +4,9 @@ use std::io::{self, Write};
 
 mod classifiers;
 use classifiers::{
-    hash_word_to_syllables, is_alpha_word, is_base32_lowercase, is_capitalized_word,
-    is_iso8601_z_datetime, is_snake_case_word, is_uppercase_word,
-    obfuscate_base32_lowercase, obfuscate_capitalized_word,
+    hash_word_to_syllables, is_alpha_word, is_base32_lowercase, is_base32_uppercase,
+    is_capitalized_word, is_iso8601_z_datetime, is_snake_case_word, is_uppercase_word,
+    obfuscate_base32_lowercase, obfuscate_base32_uppercase, obfuscate_capitalized_word,
     obfuscate_iso8601_z_datetime, obfuscate_snake_case_word, obfuscate_uppercase_word,
 };
 
@@ -23,6 +23,8 @@ fn hash_strings(value: &mut Value) {
                 *s = obfuscate_capitalized_word(s);
             } else if is_iso8601_z_datetime(s) {
                 *s = obfuscate_iso8601_z_datetime(s);
+            } else if is_base32_uppercase(s) {
+                *s = obfuscate_base32_uppercase(s);
             } else if is_base32_lowercase(s) {
                 *s = obfuscate_base32_lowercase(s);
             } else {
@@ -71,9 +73,9 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
-    use chrono::{TimeZone, Utc};
     use crate::classifiers::{set_date_baselines, DATE_TEST_GUARD};
+    use chrono::{TimeZone, Utc};
+    use serde_json::json;
 
     const TEST_SAMPLE: &str = r#"
         [
@@ -109,7 +111,8 @@ mod tests {
             "c": {"d": "y"},
             "snake": "snake_case",
             "cap": "Word",
-            "u": "UPPER"
+            "u": "UPPER",
+            "b32u": "MFRGGZDFMZTWQ2LKNNWG23TP"
         });
 
         hash_strings(&mut value);
@@ -121,6 +124,7 @@ mod tests {
         assert_eq!(value["cap"], json!("Than"));
         assert_eq!(value["snake"], json!("utcont_stathim"));
         assert_eq!(value["u"], json!("ELIKU"));
+        assert_eq!(value["b32u"], json!("VLDMNPOCMVCVJCXFTLDUCL74"));
     }
 
     #[test]
@@ -152,7 +156,7 @@ mod tests {
     "category": "MANNO",
     "created_at": "2000-01-01T00:00:00Z",
     "id": "rdhx3wx7qo75n46jwl4n7wijq5",
-    "last_edited_by": "972e64ff2f45cb894fd548bbdd0f7d430ba23400502ac9c650d4aa053360ca37",
+    "last_edited_by": "S4XGJ7ZPIXFYST6VJC552D35IM",
     "lower case word": "vericthesneup",
     "title": "Butfa",
     "updated_at": "2000-01-01T00:00:00Z",
