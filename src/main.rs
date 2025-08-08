@@ -4,8 +4,9 @@ use std::io::{self, Write};
 
 mod classifiers;
 use classifiers::{
-    hash_word_to_syllables, is_alpha_word, is_capitalized_word, is_iso8601_z_datetime,
-    is_snake_case_word, is_uppercase_word, obfuscate_capitalized_word,
+    hash_word_to_syllables, is_alpha_word, is_base32_lowercase, is_capitalized_word,
+    is_iso8601_z_datetime, is_snake_case_word, is_uppercase_word,
+    obfuscate_base32_lowercase, obfuscate_capitalized_word,
     obfuscate_iso8601_z_datetime, obfuscate_snake_case_word, obfuscate_uppercase_word,
 };
 
@@ -22,6 +23,8 @@ fn hash_strings(value: &mut Value) {
                 *s = obfuscate_capitalized_word(s);
             } else if is_iso8601_z_datetime(s) {
                 *s = obfuscate_iso8601_z_datetime(s);
+            } else if is_base32_lowercase(s) {
+                *s = obfuscate_base32_lowercase(s);
             } else {
                 let mut hasher = Sha3_256::new();
                 hasher.update(s.as_bytes());
@@ -148,7 +151,7 @@ mod tests {
     "additional_information": "4e9be9f98ffaf00dfa6849b118ec0eebaeb9d1fedf49794efc978549d692a644",
     "category": "MANNO",
     "created_at": "2000-01-01T00:00:00Z",
-    "id": "88cf7ddaff83bfd6f3c9b2f8dfd90987628b01a689b04b0d6f4d6bc05e77c8db",
+    "id": "rdhx3wx7qo75n46jwl4n7wijq5",
     "last_edited_by": "972e64ff2f45cb894fd548bbdd0f7d430ba23400502ac9c650d4aa053360ca37",
     "lower case word": "vericthesneup",
     "title": "Butfa",
@@ -161,7 +164,7 @@ mod tests {
       }
     ],
     "vault": {
-      "id": "c3427b6423f76857e8ae40651586be4c8bda92ba9c10c201755cb474ea3236d0",
+      "id": "ynbhwzbd65ufp2foibsrlbv6js",
       "name": "Hedencont"
     },
     "version": 1
