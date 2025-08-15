@@ -13,6 +13,9 @@ chrono = "0.4"
 rand = "0.8"
 data-encoding = "2.*"
 
+[dev-dependencies]
+cucumber = "0.21.1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [[bin]]
 name = "syllable_frequency"
@@ -21,3 +24,7 @@ path = "src/bin/syllable_frequency.rs"
 [[bin]]
 name = "humanise"
 path = "src/bin/humanise.rs"
+
+[[test]]
+name = "cucumber"
+harness = false
