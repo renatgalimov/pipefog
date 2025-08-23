@@ -30,6 +30,20 @@ cat secrets.json | jq . | pipefog | jq .
 original baseline. Every subsequent datetime is shifted relative to these baselines so the output
 remains a valid ISO 8601 `Z` datetime while preserving relative differences.
 
+## 🏗️ Architecture
+
+This project documents its system architecture using Mermaid diagrams, which GitHub renders natively.
+
+```mermaid
+flowchart TD
+    A[Input stream (JSON/YAML)] --> B[pipefog CLI]
+    B --> C{Mode}
+    C -->|default| D[Parse & obfuscate strings]
+    D --> E[Output stream]
+    C -->|humanise| F[Convert bytes to syllables]
+    C -->|syllable-frequency| G[Report syllable stats]
+```
+
 Planned features:
 
 - ✅ Streaming-safe – Process large files through stdin/stdout with minimal memory usage.
