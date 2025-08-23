@@ -1,4 +1,5 @@
 use cucumber::{given, then, when, World};
+use sha3::{Digest, Sha3_256};
 
 #[derive(Debug, Default, World)]
 struct TestWorld {
@@ -13,14 +14,33 @@ async fn the_input(world: &mut TestWorld, input: String) {
 
 #[when(regex = r#"^I obfuscate it as (\w+)$"#)]
 async fn i_obfuscate_it(world: &mut TestWorld, detector: String) {
+    let hash = Sha3_256::digest(world.input.as_bytes());
     world.obfuscated = match detector.as_str() {
-        "alpha_word" => pipefog::hash_word_to_syllables(&world.input),
-        "uppercase_word" => pipefog::obfuscate_uppercase_word(&world.input),
-        "capitalized_word" => pipefog::obfuscate_capitalized_word(&world.input),
-        "snake_case_word" => pipefog::obfuscate_snake_case_word(&world.input),
+        "alpha_word" => pipefog::hash_to_syllables(hash.as_slice(), world.input.len()),
+        "uppercase_word" => {
+            pipefog::hash_to_syllables(hash.as_slice(), world.input.len()).to_ascii_uppercase()
+        }
+        "capitalized_word" => {
+            let hashed = pipefog::hash_to_syllables(hash.as_slice(), world.input.len());
+            if hashed.is_empty() {
+                hashed
+            } else {
+                let mut chars = hashed.chars();
+                let first = chars.next().unwrap().to_ascii_uppercase();
+                let mut out = String::new();
+                out.push(first);
+                out.extend(chars);
+                out
+            }
+        }
+        "snake_case_word" => pipefog::hash_to_snake_case(&world.input, hash.as_slice()),
         "title_case_sentence" => pipefog::obfuscate_title_case_sentence(&world.input),
-        "base32_lowercase" => pipefog::obfuscate_base32_lowercase(&world.input),
-        "base32_uppercase" => pipefog::obfuscate_base32_uppercase(&world.input),
+        "base32_lowercase" => {
+            pipefog::hash_to_base32_lowercase(hash.as_slice(), world.input.len())
+        }
+        "base32_uppercase" => {
+            pipefog::hash_to_base32_uppercase(hash.as_slice(), world.input.len())
+        }
         _ => world.input.clone(),
     };
 }

@@ -371,7 +371,7 @@ fn hash_strings(value: &mut Value) {
     }
 }
 
-fn hash_to_syllables(hash: &[u8], len: usize) -> String {
+pub fn hash_to_syllables(hash: &[u8], len: usize) -> String {
     let mut out = String::new();
     for &b in hash {
         out.push_str(SYLLABLES[b as usize]);
@@ -403,7 +403,7 @@ fn hash_to_syllable_vec(hash: &[u8], count: usize) -> Vec<&'static str> {
     out
 }
 
-fn hash_to_snake_case(word: &str, hash: &[u8]) -> String {
+pub fn hash_to_snake_case(word: &str, hash: &[u8]) -> String {
     let leading = word.chars().take_while(|&c| c == '_').count();
     let trailing = word.chars().rev().take_while(|&c| c == '_').count();
 
@@ -432,7 +432,7 @@ fn hash_to_snake_case(word: &str, hash: &[u8]) -> String {
     out
 }
 
-fn hash_to_base32_lowercase(hash: &[u8], len: usize) -> String {
+pub fn hash_to_base32_lowercase(hash: &[u8], len: usize) -> String {
     let encoded = BASE32_NOPAD.encode(hash).to_lowercase();
     if encoded.len() >= len {
         encoded[..len].to_string()
@@ -448,7 +448,7 @@ fn hash_to_base32_lowercase(hash: &[u8], len: usize) -> String {
     }
 }
 
-fn hash_to_base32_uppercase(hash: &[u8], len: usize) -> String {
+pub fn hash_to_base32_uppercase(hash: &[u8], len: usize) -> String {
     let encoded = BASE32_NOPAD.encode(hash).to_uppercase();
     if encoded.len() >= len {
         encoded[..len].to_string()
