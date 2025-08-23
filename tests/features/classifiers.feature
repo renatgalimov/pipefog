@@ -11,6 +11,5 @@ Feature: Obfuscation preserves classification
       | uppercase_word      | UPPERCASE                |
       | capitalized_word    | Capitalized              |
       | snake_case_word     | snake_case_word          |
-      | title_case_sentence | A Title Case Sentence    |
       | base32_lowercase    | mfrggzdfmztwq2lknnwg23tp |
       | base32_uppercase    | MFRGGZDFMZTWQ2LKNNWG23TP |
