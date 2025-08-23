@@ -38,8 +38,26 @@ This project documents its system architecture using Mermaid diagrams, which Git
 graph TD
     A["Input stream (JSON/YAML)"] --> B["pipefog CLI"]
     B --> C["Mode"]
-    C -->|default| D["Parse & obfuscate strings"]
-    D --> E["Output stream"]
+    C -->|default| D1["Parse tokens"]
+    D1 --> D2{String type?}
+    D2 -->|alpha_word| H1["hash_word_to_syllables"]
+    D2 -->|uppercase_word| H2["obfuscate_uppercase_word"]
+    D2 -->|capitalized_word| H3["obfuscate_capitalized_word"]
+    D2 -->|snake_case_word| H4["obfuscate_snake_case_word"]
+    D2 -->|title_case_sentence| H5["obfuscate_title_case_sentence"]
+    D2 -->|iso8601_z_datetime| H6["obfuscate_iso8601_z_datetime"]
+    D2 -->|base32_lowercase| H7["obfuscate_base32_lowercase"]
+    D2 -->|base32_uppercase| H8["obfuscate_base32_uppercase"]
+    D2 -->|no match| H9["pass through"]
+    H1 --> E["Output stream"]
+    H2 --> E
+    H3 --> E
+    H4 --> E
+    H5 --> E
+    H6 --> E
+    H7 --> E
+    H8 --> E
+    H9 --> E
     C -->|humanise| F["Convert bytes to syllables"]
     C -->|syllable-frequency| G["Report syllable stats"]
 ```
