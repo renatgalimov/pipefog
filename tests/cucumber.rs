@@ -35,12 +35,8 @@ async fn i_obfuscate_it(world: &mut TestWorld, detector: String) {
         }
         "snake_case_word" => pipefog::hash_to_snake_case(&world.input, hash.as_slice()),
         "title_case_sentence" => pipefog::obfuscate_title_case_sentence(&world.input),
-        "base32_lowercase" => {
-            pipefog::hash_to_base32_lowercase(hash.as_slice(), world.input.len())
-        }
-        "base32_uppercase" => {
-            pipefog::hash_to_base32_uppercase(hash.as_slice(), world.input.len())
-        }
+        "base32_lowercase" => pipefog::hash_to_base32_lowercase(hash.as_slice(), world.input.len()),
+        "base32_uppercase" => pipefog::hash_to_base32_uppercase(hash.as_slice(), world.input.len()),
         _ => world.input.clone(),
     };
 }
