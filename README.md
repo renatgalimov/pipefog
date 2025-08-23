@@ -39,16 +39,18 @@ graph TD
     A["Input stream (JSON/YAML)"] --> B["pipefog CLI"]
     B --> C["Mode"]
     C -->|default| D1["Parse tokens"]
+    D1 --> H0["sha256 hash"]
     D1 --> D2{String type?}
-    D2 -->|alpha_word| H1["hash_word_to_syllables"]
-    D2 -->|uppercase_word| H2["obfuscate_uppercase_word"]
-    D2 -->|capitalized_word| H3["obfuscate_capitalized_word"]
-    D2 -->|snake_case_word| H4["obfuscate_snake_case_word"]
+    H0 --> D2
+    D2 -->|alpha_word| H1["hash→syllables"]
+    D2 -->|uppercase_word| H2["hash→syllables→upper"]
+    D2 -->|capitalized_word| H3["hash→syllables→capitalized"]
+    D2 -->|snake_case_word| H4["hash→snake_case"]
     D2 -->|title_case_sentence| H5["obfuscate_title_case_sentence"]
     D2 -->|iso8601_z_datetime| H6["obfuscate_iso8601_z_datetime"]
-    D2 -->|base32_lowercase| H7["obfuscate_base32_lowercase"]
-    D2 -->|base32_uppercase| H8["obfuscate_base32_uppercase"]
-    D2 -->|no match| H9["sha256 hash"]
+    D2 -->|base32_lowercase| H7["hash→base32_lower"]
+    D2 -->|base32_uppercase| H8["hash→base32_upper"]
+    D2 -->|no match| H9["hex encode hash"]
     H1 --> E["Output stream"]
     H2 --> E
     H3 --> E

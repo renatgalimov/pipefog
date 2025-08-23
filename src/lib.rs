@@ -151,65 +151,31 @@ pub fn rough_english_syllables(word: &str) -> Vec<String> {
 /// Deterministically obfuscate a lowercase word into another lowercase word of
 /// the same length using a syllable table.
 pub fn hash_word_to_syllables(word: &str) -> String {
-    let mut hasher = Sha3_256::new();
-    hasher.update(word.as_bytes());
-    let hash = hasher.finalize();
-
-    let mut out = String::new();
-    for &b in hash.as_slice() {
-        out.push_str(SYLLABLES[b as usize]);
-    }
-
-    if out.len() >= word.len() {
-        out.truncate(word.len());
-    } else {
-        while out.len() < word.len() {
-            for &b in hash.as_slice() {
-                out.push_str(SYLLABLES[b as usize]);
-                if out.len() >= word.len() {
-                    break;
-                }
-            }
-        }
-        out.truncate(word.len());
-    }
-
-    out
+    let hash = Sha3_256::digest(word.as_bytes());
+    hash_to_syllables(hash.as_slice(), word.len())
 }
 
 /// Produce a deterministic vector of syllables for a word using the same
 /// hashing mechanism as `hash_word_to_syllables`. The returned vector will
 /// contain `count` syllables, repeating the hash output if necessary.
 pub fn hash_word_to_syllable_vec(word: &str, count: usize) -> Vec<&'static str> {
-    let mut hasher = Sha3_256::new();
-    hasher.update(word.as_bytes());
-    let hash = hasher.finalize();
-
-    let mut out = Vec::with_capacity(count);
-    let mut iter = hash.as_slice().iter().cycle();
-    for _ in 0..count {
-        if let Some(b) = iter.next() {
-            out.push(SYLLABLES[*b as usize]);
-        }
-    }
-    out
+    let hash = Sha3_256::digest(word.as_bytes());
+    hash_to_syllable_vec(hash.as_slice(), count)
 }
 
 /// Obfuscate an uppercase word into another deterministic uppercase word of the
 /// same length. The output will also be recognised by `is_uppercase_word`.
 pub fn obfuscate_uppercase_word(word: &str) -> String {
-    // Reuse the lowercase syllable obfuscation and convert the result to
-    // uppercase. This guarantees determinism while sharing the syllable table
-    // logic with `hash_word_to_syllables`.
-    let hashed = hash_word_to_syllables(&word.to_lowercase());
-    hashed.to_ascii_uppercase()
+    let hash = Sha3_256::digest(word.as_bytes());
+    hash_to_syllables(hash.as_slice(), word.len()).to_ascii_uppercase()
 }
 
 /// Obfuscate a capitalized word (first letter uppercase, rest lowercase) into
 /// another deterministic capitalized word of the same length. The output will
 /// also be recognised by `is_capitalized_word`.
 pub fn obfuscate_capitalized_word(word: &str) -> String {
-    let hashed = hash_word_to_syllables(&word.to_lowercase());
+    let hash = Sha3_256::digest(word.as_bytes());
+    let hashed = hash_to_syllables(hash.as_slice(), word.len());
     if hashed.is_empty() {
         return hashed;
     }
@@ -226,35 +192,8 @@ pub fn obfuscate_capitalized_word(word: &str) -> String {
 /// between each pair. Leading and trailing underscores from the input are
 /// preserved. The resulting string will still satisfy `is_snake_case_word`.
 pub fn obfuscate_snake_case_word(word: &str) -> String {
-    let leading = word.chars().take_while(|&c| c == '_').count();
-    let trailing = word.chars().rev().take_while(|&c| c == '_').count();
-
-    let letters: String = word.chars().filter(|&c| c != '_').collect();
-    // Use the full word for hashing so that underscore positions affect the
-    // result. Determine the number of output syllables based on a simple
-    // English syllable split of the letters-only portion.
-    let syllable_count = rough_english_syllables(&letters).len();
-    let syllables = hash_word_to_syllable_vec(word, syllable_count);
-
-    let mut parts = Vec::new();
-    let mut i = 0;
-    while i < syllables.len() {
-        let mut part = String::new();
-        part.push_str(syllables[i]);
-        if i + 1 < syllables.len() {
-            part.push_str(syllables[i + 1]);
-        }
-        parts.push(part);
-        i += 2;
-    }
-
-    let core = parts.join("_");
-
-    let mut out = String::new();
-    out.extend(std::iter::repeat_n('_', leading));
-    out.push_str(&core);
-    out.extend(std::iter::repeat_n('_', trailing));
-    out
+    let hash = Sha3_256::digest(word.as_bytes());
+    hash_to_snake_case(word, hash.as_slice())
 }
 
 /// Obfuscate a Title Case sentence by hashing the entire sentence and
@@ -307,46 +246,16 @@ pub fn obfuscate_title_case_sentence(sentence: &str) -> String {
 /// the hash using lowercase Base32 without padding. The resulting string is
 /// truncated or repeated so that its length matches the input.
 pub fn obfuscate_base32_lowercase(input: &str) -> String {
-    let mut hasher = Sha3_256::new();
-    hasher.update(input.as_bytes());
-    let hash = hasher.finalize();
-
-    let encoded = BASE32_NOPAD.encode(hash.as_ref()).to_lowercase();
-    if encoded.len() >= input.len() {
-        encoded[..input.len()].to_string()
-    } else {
-        let mut out = String::with_capacity(input.len());
-        let mut iter = encoded.chars().cycle();
-        while out.len() < input.len() {
-            if let Some(ch) = iter.next() {
-                out.push(ch);
-            }
-        }
-        out
-    }
+    let hash = Sha3_256::digest(input.as_bytes());
+    hash_to_base32_lowercase(hash.as_slice(), input.len())
 }
 
 /// Obfuscate an uppercase Base32 string by hashing it with SHA3-256 and encoding
 /// the hash using uppercase Base32 without padding. The resulting string is
 /// truncated or repeated so that its length matches the input.
 pub fn obfuscate_base32_uppercase(input: &str) -> String {
-    let mut hasher = Sha3_256::new();
-    hasher.update(input.as_bytes());
-    let hash = hasher.finalize();
-
-    let encoded = BASE32_NOPAD.encode(hash.as_ref()).to_uppercase();
-    if encoded.len() >= input.len() {
-        encoded[..input.len()].to_string()
-    } else {
-        let mut out = String::with_capacity(input.len());
-        let mut iter = encoded.chars().cycle();
-        while out.len() < input.len() {
-            if let Some(ch) = iter.next() {
-                out.push(ch);
-            }
-        }
-        out
-    }
+    let hash = Sha3_256::digest(input.as_bytes());
+    hash_to_base32_uppercase(hash.as_slice(), input.len())
 }
 
 fn random_date_between_1970_and_now() -> DateTime<Utc> {
@@ -419,25 +328,33 @@ lazy_static! {
 fn hash_strings(value: &mut Value) {
     match value {
         Value::String(s) => {
+            let hash = Sha3_256::digest(s.as_bytes());
             if is_alpha_word(s) {
-                *s = hash_word_to_syllables(s);
+                *s = hash_to_syllables(hash.as_slice(), s.len());
             } else if is_snake_case_word(s) {
-                *s = obfuscate_snake_case_word(s);
+                *s = hash_to_snake_case(s, hash.as_slice());
             } else if is_uppercase_word(s) {
-                *s = obfuscate_uppercase_word(s);
+                *s = hash_to_syllables(hash.as_slice(), s.len()).to_ascii_uppercase();
             } else if is_capitalized_word(s) {
-                *s = obfuscate_capitalized_word(s);
+                let hashed = hash_to_syllables(hash.as_slice(), s.len());
+                if hashed.is_empty() {
+                    *s = hashed;
+                } else {
+                    let mut chars = hashed.chars();
+                    if let Some(first) = chars.next() {
+                        *s = first.to_ascii_uppercase().to_string() + chars.as_str();
+                    } else {
+                        *s = hashed;
+                    }
+                }
             } else if is_iso8601_z_datetime(s) {
                 *s = obfuscate_iso8601_z_datetime(s);
             } else if is_base32_uppercase(s) {
-                *s = obfuscate_base32_uppercase(s);
+                *s = hash_to_base32_uppercase(hash.as_slice(), s.len());
             } else if is_base32_lowercase(s) {
-                *s = obfuscate_base32_lowercase(s);
+                *s = hash_to_base32_lowercase(hash.as_slice(), s.len());
             } else {
-                let mut hasher = Sha3_256::new();
-                hasher.update(s.as_bytes());
-                let result = hasher.finalize();
-                *s = hex::encode(result);
+                *s = hex::encode(hash.as_slice());
             }
         }
         Value::Array(arr) => {
@@ -451,6 +368,99 @@ fn hash_strings(value: &mut Value) {
             }
         }
         _ => {}
+    }
+}
+
+fn hash_to_syllables(hash: &[u8], len: usize) -> String {
+    let mut out = String::new();
+    for &b in hash {
+        out.push_str(SYLLABLES[b as usize]);
+    }
+    if out.len() >= len {
+        out.truncate(len);
+    } else {
+        while out.len() < len {
+            for &b in hash {
+                out.push_str(SYLLABLES[b as usize]);
+                if out.len() >= len {
+                    break;
+                }
+            }
+        }
+        out.truncate(len);
+    }
+    out
+}
+
+fn hash_to_syllable_vec(hash: &[u8], count: usize) -> Vec<&'static str> {
+    let mut out = Vec::with_capacity(count);
+    let mut iter = hash.iter().cycle();
+    for _ in 0..count {
+        if let Some(&b) = iter.next() {
+            out.push(SYLLABLES[b as usize]);
+        }
+    }
+    out
+}
+
+fn hash_to_snake_case(word: &str, hash: &[u8]) -> String {
+    let leading = word.chars().take_while(|&c| c == '_').count();
+    let trailing = word.chars().rev().take_while(|&c| c == '_').count();
+
+    let letters: String = word.chars().filter(|&c| c != '_').collect();
+    let syllable_count = rough_english_syllables(&letters).len();
+    let syllables = hash_to_syllable_vec(hash, syllable_count);
+
+    let mut parts = Vec::new();
+    let mut i = 0;
+    while i < syllables.len() {
+        let mut part = String::new();
+        part.push_str(syllables[i]);
+        if i + 1 < syllables.len() {
+            part.push_str(syllables[i + 1]);
+        }
+        parts.push(part);
+        i += 2;
+    }
+
+    let core = parts.join("_");
+
+    let mut out = String::new();
+    out.extend(std::iter::repeat_n('_', leading));
+    out.push_str(&core);
+    out.extend(std::iter::repeat_n('_', trailing));
+    out
+}
+
+fn hash_to_base32_lowercase(hash: &[u8], len: usize) -> String {
+    let encoded = BASE32_NOPAD.encode(hash).to_lowercase();
+    if encoded.len() >= len {
+        encoded[..len].to_string()
+    } else {
+        let mut out = String::with_capacity(len);
+        let mut iter = encoded.chars().cycle();
+        while out.len() < len {
+            if let Some(ch) = iter.next() {
+                out.push(ch);
+            }
+        }
+        out
+    }
+}
+
+fn hash_to_base32_uppercase(hash: &[u8], len: usize) -> String {
+    let encoded = BASE32_NOPAD.encode(hash).to_uppercase();
+    if encoded.len() >= len {
+        encoded[..len].to_string()
+    } else {
+        let mut out = String::with_capacity(len);
+        let mut iter = encoded.chars().cycle();
+        while out.len() < len {
+            if let Some(ch) = iter.next() {
+                out.push(ch);
+            }
+        }
+        out
     }
 }
 
@@ -644,9 +654,9 @@ mod tests {
         assert_eq!(value["b"][0], json!("s"));
         assert_eq!(value["b"][1], json!(1));
         assert_eq!(value["c"]["d"], json!("i"));
-        assert_eq!(value["cap"], json!("Than"));
+        assert_eq!(value["cap"], json!("Boge"));
         assert_eq!(value["snake"], json!("utcont_stathim"));
-        assert_eq!(value["u"], json!("ELIKU"));
+        assert_eq!(value["u"], json!("ERGIL"));
         assert_eq!(value["b32u"], json!("VLDMNPOCMVCVJCXFTLDUCL74"));
     }
 
@@ -672,12 +682,12 @@ mod tests {
         const EXPECTED_HASHES: &str = r#"[
   {
     "additional_information": "4e9be9f98ffaf00dfa6849b118ec0eebaeb9d1fedf49794efc978549d692a644",
-    "category": "MANNO",
+    "category": "AGRWH",
     "created_at": "2000-01-01T00:00:00Z",
     "id": "rdhx3wx7qo75n46jwl4n7wijq5",
     "last_edited_by": "S4XGJ7ZPIXFYST6VJC552D35IM",
     "lower case word": "vericthesneup",
-    "title": "Butfa",
+    "title": "Danin",
     "updated_at": "2000-01-01T00:00:00Z",
     "urls": [
       {
@@ -688,7 +698,7 @@ mod tests {
     ],
     "vault": {
       "id": "ynbhwzbd65ufp2foibsrlbv6js",
-      "name": "Hedencont"
+      "name": "Suchardwi"
     },
     "version": 1
   }
