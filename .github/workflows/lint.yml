@@ -26,12 +26,17 @@ jobs:
       - name: Check out Git repository
         uses: actions/checkout@v4
 
-      # Install your linters here
-
-      - name: Run linters
+      - name: Run Lint Action (Clippy + rustfmt with auto-fix)
         uses: wearerequired/lint-action@v2
         with:
-          clippy: true
+          # Turn on global auto-fix + commit
+          auto_fix: true
+          commit_message: "chore(lint): auto-fix with ${linter}"
+
+          # ---- rustfmt ----
           rustfmt: true
-          
-          
+
+          # ---- clippy ----
+          clippy: true
+          # Make CI fail on any clippy warning (but still attempt auto-fix first)
+          clippy_args: "--all-targets --all-features -- -D warnings"
