@@ -251,9 +251,9 @@ pub const SYLLABLES: &[&str] = &[
         let core = parts.join("_");
     
         let mut out = String::new();
-        out.extend(std::iter::repeat('_').take(leading));
+        out.extend(std::iter::repeat_n('_', leading));
         out.push_str(&core);
-        out.extend(std::iter::repeat('_').take(trailing));
+        out.extend(std::iter::repeat_n('_', trailing));
         out
     }
     
@@ -400,14 +400,14 @@ pub const SYLLABLES: &[&str] = &[
             .with_timezone(&Utc);
         let mut orig = ORIGINAL_DATE_BASELINE.lock().unwrap();
         let orig_dt = match *orig {
-            Some(ref orig_dt) => orig_dt.clone(),
+            Some(ref orig_dt) => *orig_dt,
             None => {
                 *orig = Some(dt);
                 dt
             }
         };
         let delta = orig_dt - dt;
-        let new_dt_base = NEW_DATE_BASELINE.lock().unwrap().clone();
+        let new_dt_base = *NEW_DATE_BASELINE.lock().unwrap();
         let new_dt = new_dt_base + delta;
         new_dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()
     }
