@@ -37,7 +37,7 @@ This project documents its system architecture using Mermaid diagrams, which Git
 ```mermaid
 flowchart TD
     A[Input stream (JSON/YAML)] --> B[pipefog CLI]
-    B --> C{Mode}
+    B --> C[Mode]
     C -->|default| D[Parse & obfuscate strings]
     D --> E[Output stream]
     C -->|humanise| F[Convert bytes to syllables]
