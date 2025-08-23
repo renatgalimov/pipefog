@@ -48,7 +48,7 @@ graph TD
     D2 -->|iso8601_z_datetime| H6["obfuscate_iso8601_z_datetime"]
     D2 -->|base32_lowercase| H7["obfuscate_base32_lowercase"]
     D2 -->|base32_uppercase| H8["obfuscate_base32_uppercase"]
-    D2 -->|no match| H9["pass through"]
+    D2 -->|no match| H9["sha256 hash"]
     H1 --> E["Output stream"]
     H2 --> E
     H3 --> E
