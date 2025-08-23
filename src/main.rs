@@ -1,20 +1,16 @@
+use chrono::{DateTime, TimeZone, Utc};
+use data_encoding::BASE32_NOPAD;
+use lazy_static::lazy_static;
+use rand::Rng;
+use regex::Regex;
 use serde_json::{Deserializer, Value};
 use sha3::{Digest, Sha3_256};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
-use lazy_static::lazy_static;
-use regex::Regex;
+use std::sync::Mutex;
 
-mod classifiers {
-    use chrono::{DateTime, TimeZone, Utc};
-    use data_encoding::BASE32_NOPAD;
-    use lazy_static::lazy_static;
-    use rand::Rng;
-    use sha3::{Digest, Sha3_256};
-    use std::sync::Mutex;
-    
-    /// Syllables used for obfuscating lowercase words.
-    pub const SYLLABLES: &[&str] = &[
+/// Syllables used for obfuscating lowercase words.
+pub const SYLLABLES: &[&str] = &[
         "plac", "most", "sam", "ke", "uth", "arl", "het", "giv", "fa", "first", "own", "li", "van",
         "form", "pres", "ond", "men", "bef", "old", "agr", "must", "two", "ight", "mak", "cons", "nat",
         "den", "rem", "inst", "eb", "itt", "iss", "tak", "ars", "ap", "app", "iz", "wher", "ec", "mad",
@@ -415,14 +411,8 @@ mod classifiers {
         let new_dt = new_dt_base + delta;
         new_dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()
     }
-    
-}
-use classifiers::{
-    hash_word_to_syllables, is_alpha_word, is_base32_lowercase, is_base32_uppercase,
-    is_capitalized_word, is_iso8601_z_datetime, is_snake_case_word, is_uppercase_word,
-    obfuscate_base32_lowercase, obfuscate_base32_uppercase, obfuscate_capitalized_word,
-    obfuscate_iso8601_z_datetime, obfuscate_snake_case_word, obfuscate_uppercase_word,
-};
+
+
 
 lazy_static! {
     static ref WORD_RE: Regex = Regex::new(r"[A-Za-z]+").unwrap();
@@ -469,7 +459,7 @@ fn hash_strings(value: &mut Value) {
 fn bytes_to_syllables(bytes: &[u8]) -> String {
     let mut out = String::new();
     for &b in bytes {
-        out.push_str(classifiers::SYLLABLES[b as usize]);
+        out.push_str(SYLLABLES[b as usize]);
     }
     out
 }
@@ -478,7 +468,7 @@ fn count_syllables(text: &str) -> Vec<(String, usize)> {
     let mut freq: HashMap<String, usize> = HashMap::new();
     for mat in WORD_RE.find_iter(text) {
         let word = mat.as_str().to_lowercase();
-        for syl in classifiers::rough_english_syllables(&word) {
+        for syl in rough_english_syllables(&word) {
             *freq.entry(syl).or_insert(0) += 1;
         }
     }
@@ -587,7 +577,7 @@ mod tests {
         ]"#;
 
     fn reset_date_baselines() {
-        classifiers::set_date_baselines(
+        set_date_baselines(
             Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap(),
         );
     }
@@ -597,7 +587,7 @@ mod tests {
         let result = bytes_to_syllables(&[0x00, 0xff, 0x10]);
         assert_eq!(
             result,
-            format!("{}{}{}", classifiers::SYLLABLES[0], classifiers::SYLLABLES[255], classifiers::SYLLABLES[16])
+            format!("{}{}{}", SYLLABLES[0], SYLLABLES[255], SYLLABLES[16])
         );
     }
 
@@ -614,7 +604,7 @@ mod tests {
         assert_eq!(bytes, vec![0x0a, 0x0b]);
         assert_eq!(
             bytes_to_syllables(&bytes),
-            format!("{}{}", classifiers::SYLLABLES[0x0a], classifiers::SYLLABLES[0x0b])
+            format!("{}{}", SYLLABLES[0x0a], SYLLABLES[0x0b])
         );
     }
 
@@ -675,8 +665,8 @@ mod tests {
 
     #[test]
     fn test_hash_strings_test_sample() {
-        let _guard = classifiers::DATE_TEST_GUARD.lock().unwrap();
-        classifiers::set_date_baselines(
+        let _guard = DATE_TEST_GUARD.lock().unwrap();
+        set_date_baselines(
             Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap(),
         );
         let test_sample: Value = serde_json::from_str(TEST_SAMPLE).expect("Failed to parse TEST_SAMPLE");
@@ -753,10 +743,10 @@ mod tests {
 
     #[test]
     fn test_is_title_case_sentence_examples() {
-        assert!(classifiers::is_title_case_sentence("A Title Case Sentence"));
-        assert!(!classifiers::is_title_case_sentence("A title Case"));
-        assert!(!classifiers::is_title_case_sentence("A"));
-        assert!(!classifiers::is_title_case_sentence(""));
+        assert!(is_title_case_sentence("A Title Case Sentence"));
+        assert!(!is_title_case_sentence("A title Case"));
+        assert!(!is_title_case_sentence("A"));
+        assert!(!is_title_case_sentence(""));
     }
 
     #[test]
@@ -807,7 +797,7 @@ mod tests {
             if is_snake_case_word(example.input) {
                 detected.insert("snake_case_word");
             }
-            if classifiers::is_title_case_sentence(example.input) {
+            if is_title_case_sentence(example.input) {
                 detected.insert("title_case_sentence");
             }
             if is_iso8601_z_datetime(example.input) {
@@ -826,7 +816,7 @@ mod tests {
 
     #[test]
     fn test_well_known_inputs_obfuscation() {
-        let _guard = classifiers::DATE_TEST_GUARD.lock().unwrap();
+        let _guard = DATE_TEST_GUARD.lock().unwrap();
         reset_date_baselines();
         for example in WELL_KNOWN_INPUTS {
             for &name in example.detectors {
@@ -835,7 +825,7 @@ mod tests {
                     "uppercase_word" => obfuscate_uppercase_word(example.input),
                     "capitalized_word" => obfuscate_capitalized_word(example.input),
                     "snake_case_word" => obfuscate_snake_case_word(example.input),
-                    "title_case_sentence" => classifiers::obfuscate_title_case_sentence(example.input),
+                    "title_case_sentence" => obfuscate_title_case_sentence(example.input),
                     "iso8601_z_datetime" => obfuscate_iso8601_z_datetime(example.input),
                     "base32_lowercase" => obfuscate_base32_lowercase(example.input),
                     "base32_uppercase" => obfuscate_base32_uppercase(example.input),
@@ -846,7 +836,7 @@ mod tests {
                     "uppercase_word" => is_uppercase_word(&obf),
                     "capitalized_word" => is_capitalized_word(&obf),
                     "snake_case_word" => is_snake_case_word(&obf),
-                    "title_case_sentence" => classifiers::is_title_case_sentence(&obf),
+                    "title_case_sentence" => is_title_case_sentence(&obf),
                     "iso8601_z_datetime" => is_iso8601_z_datetime(&obf),
                     "base32_lowercase" => is_base32_lowercase(&obf),
                     "base32_uppercase" => is_base32_uppercase(&obf),
@@ -867,7 +857,7 @@ mod tests {
 
     #[test]
     fn test_obfuscate_iso8601_z_datetime_preserves_class() {
-        let _guard = classifiers::DATE_TEST_GUARD.lock().unwrap();
+        let _guard = DATE_TEST_GUARD.lock().unwrap();
         reset_date_baselines();
         let first = "2022-05-16T22:39:20Z";
         let second = "2022-05-15T22:39:20Z";
@@ -887,7 +877,7 @@ mod tests {
         let second_dt = chrono::DateTime::parse_from_rfc3339(second)
             .unwrap()
             .with_timezone(&Utc);
-        assert_eq!(obf_first_dt, *classifiers::NEW_DATE_BASELINE.lock().unwrap());
+        assert_eq!(obf_first_dt, *NEW_DATE_BASELINE.lock().unwrap());
         assert_eq!(obf_second_dt - obf_first_dt, first_dt - second_dt);
     }
 }
