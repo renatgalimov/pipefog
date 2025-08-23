@@ -10,7 +10,7 @@ use std::io::{self, Read, Write};
 use std::sync::Mutex;
 
 /// Syllables used for obfuscating lowercase words.
-pub const SYLLABLES: &[&str] = &[
+pub(crate) const SYLLABLES: &[&str] = &[
     "plac", "most", "sam", "ke", "uth", "arl", "het", "giv", "fa", "first", "own", "li", "van",
     "form", "pres", "ond", "men", "bef", "old", "agr", "must", "two", "ight", "mak", "cons", "nat",
     "den", "rem", "inst", "eb", "itt", "iss", "tak", "ars", "ap", "app", "iz", "wher", "ec", "mad",
@@ -35,21 +35,21 @@ pub const SYLLABLES: &[&str] = &[
 /// Detects whether the provided string is composed entirely of ASCII lowercase
 /// letters.
 ///
-pub fn is_alpha_word(input: &str) -> bool {
+pub(crate) fn is_alpha_word(input: &str) -> bool {
     !input.is_empty() && input.chars().all(|c| c.is_ascii_lowercase())
 }
 
 /// Detects whether the provided string is composed entirely of ASCII uppercase
 /// letters.
 ///
-pub fn is_uppercase_word(input: &str) -> bool {
+pub(crate) fn is_uppercase_word(input: &str) -> bool {
     !input.is_empty() && input.chars().all(|c| c.is_ascii_uppercase())
 }
 
 /// Detects whether the provided string is a capitalized word where the first
 /// character is uppercase ASCII and the remaining characters are lowercase
 /// ASCII.
-pub fn is_capitalized_word(input: &str) -> bool {
+pub(crate) fn is_capitalized_word(input: &str) -> bool {
     if input.is_empty() {
         return false;
     }
@@ -62,7 +62,7 @@ pub fn is_capitalized_word(input: &str) -> bool {
 
 /// Detects whether the provided string is snake_case consisting of ASCII
 /// lowercase letters and underscores with at least one underscore.
-pub fn is_snake_case_word(input: &str) -> bool {
+pub(crate) fn is_snake_case_word(input: &str) -> bool {
     if input.is_empty() {
         return false;
     }
@@ -77,48 +77,23 @@ pub fn is_snake_case_word(input: &str) -> bool {
     has_underscore
 }
 
-/// Detects whether the provided string is a sentence in Title Case. Each word
-/// must start with a capital letter followed by lowercase letters. Single-letter
-/// words must be uppercase.
-pub fn is_title_case_sentence(input: &str) -> bool {
-    if input.trim().is_empty() {
-        return false;
-    }
-    let mut word_count = 0;
-    for token in input.split_whitespace() {
-        let trimmed = token.trim_matches(|c: char| !c.is_ascii_alphabetic());
-        if trimmed.is_empty() {
-            return false;
-        }
-        if trimmed.chars().count() == 1 {
-            if !is_uppercase_word(trimmed) {
-                return false;
-            }
-        } else if !is_capitalized_word(trimmed) {
-            return false;
-        }
-        word_count += 1;
-    }
-    word_count > 1
-}
-
 /// Detects whether the provided string is a lowercase Base32 value. The string
 /// must consist only of the characters `a`-`z` and `2`-`7` and have a length
 /// greater than 16 characters.
-pub fn is_base32_lowercase(input: &str) -> bool {
+pub(crate) fn is_base32_lowercase(input: &str) -> bool {
     input.len() > 16 && input.chars().all(|c| matches!(c, 'a'..='z' | '2'..='7'))
 }
 
 /// Detects whether the provided string is an uppercase Base32 value. The
 /// string must consist only of the characters `A`-`Z` and `2`-`7` and have a
 /// length greater than 16 characters.
-pub fn is_base32_uppercase(input: &str) -> bool {
+pub(crate) fn is_base32_uppercase(input: &str) -> bool {
     input.len() > 16 && input.chars().all(|c| matches!(c, 'A'..='Z' | '2'..='7'))
 }
 
 /// Split a word into approximate English syllables using the same logic as the
 /// helper in `bin/syllable_frequency.rs`.
-pub fn rough_english_syllables(word: &str) -> Vec<String> {
+pub(crate) fn rough_english_syllables(word: &str) -> Vec<String> {
     let mut syllables = Vec::new();
     let mut buffer = String::new();
     let chars: Vec<char> = word.chars().collect();
@@ -148,207 +123,6 @@ pub fn rough_english_syllables(word: &str) -> Vec<String> {
     syllables
 }
 
-/// Deterministically obfuscate a lowercase word into another lowercase word of
-/// the same length using a syllable table.
-pub fn hash_word_to_syllables(word: &str) -> String {
-    let mut hasher = Sha3_256::new();
-    hasher.update(word.as_bytes());
-    let hash = hasher.finalize();
-
-    let mut out = String::new();
-    for &b in hash.as_slice() {
-        out.push_str(SYLLABLES[b as usize]);
-    }
-
-    if out.len() >= word.len() {
-        out.truncate(word.len());
-    } else {
-        while out.len() < word.len() {
-            for &b in hash.as_slice() {
-                out.push_str(SYLLABLES[b as usize]);
-                if out.len() >= word.len() {
-                    break;
-                }
-            }
-        }
-        out.truncate(word.len());
-    }
-
-    out
-}
-
-/// Produce a deterministic vector of syllables for a word using the same
-/// hashing mechanism as `hash_word_to_syllables`. The returned vector will
-/// contain `count` syllables, repeating the hash output if necessary.
-pub fn hash_word_to_syllable_vec(word: &str, count: usize) -> Vec<&'static str> {
-    let mut hasher = Sha3_256::new();
-    hasher.update(word.as_bytes());
-    let hash = hasher.finalize();
-
-    let mut out = Vec::with_capacity(count);
-    let mut iter = hash.as_slice().iter().cycle();
-    for _ in 0..count {
-        if let Some(b) = iter.next() {
-            out.push(SYLLABLES[*b as usize]);
-        }
-    }
-    out
-}
-
-/// Obfuscate an uppercase word into another deterministic uppercase word of the
-/// same length. The output will also be recognised by `is_uppercase_word`.
-pub fn obfuscate_uppercase_word(word: &str) -> String {
-    // Reuse the lowercase syllable obfuscation and convert the result to
-    // uppercase. This guarantees determinism while sharing the syllable table
-    // logic with `hash_word_to_syllables`.
-    let hashed = hash_word_to_syllables(&word.to_lowercase());
-    hashed.to_ascii_uppercase()
-}
-
-/// Obfuscate a capitalized word (first letter uppercase, rest lowercase) into
-/// another deterministic capitalized word of the same length. The output will
-/// also be recognised by `is_capitalized_word`.
-pub fn obfuscate_capitalized_word(word: &str) -> String {
-    let hashed = hash_word_to_syllables(&word.to_lowercase());
-    if hashed.is_empty() {
-        return hashed;
-    }
-    let mut chars = hashed.chars();
-    let first = chars.next().unwrap().to_ascii_uppercase();
-    let mut out = String::new();
-    out.push(first);
-    out.extend(chars);
-    out
-}
-
-/// Obfuscate a snake_case word by hashing all characters except underscores.
-/// The hashed syllables are combined in pairs and an underscore is inserted
-/// between each pair. Leading and trailing underscores from the input are
-/// preserved. The resulting string will still satisfy `is_snake_case_word`.
-pub fn obfuscate_snake_case_word(word: &str) -> String {
-    let leading = word.chars().take_while(|&c| c == '_').count();
-    let trailing = word.chars().rev().take_while(|&c| c == '_').count();
-
-    let letters: String = word.chars().filter(|&c| c != '_').collect();
-    // Use the full word for hashing so that underscore positions affect the
-    // result. Determine the number of output syllables based on a simple
-    // English syllable split of the letters-only portion.
-    let syllable_count = rough_english_syllables(&letters).len();
-    let syllables = hash_word_to_syllable_vec(word, syllable_count);
-
-    let mut parts = Vec::new();
-    let mut i = 0;
-    while i < syllables.len() {
-        let mut part = String::new();
-        part.push_str(syllables[i]);
-        if i + 1 < syllables.len() {
-            part.push_str(syllables[i + 1]);
-        }
-        parts.push(part);
-        i += 2;
-    }
-
-    let core = parts.join("_");
-
-    let mut out = String::new();
-    out.extend(std::iter::repeat_n('_', leading));
-    out.push_str(&core);
-    out.extend(std::iter::repeat_n('_', trailing));
-    out
-}
-
-/// Obfuscate a Title Case sentence by hashing the entire sentence and
-/// rebuilding each word from the hash. The resulting sentence will still be in
-/// Title Case.
-pub fn obfuscate_title_case_sentence(sentence: &str) -> String {
-    let mut hasher = Sha3_256::new();
-    hasher.update(sentence.as_bytes());
-    let hash = hasher.finalize();
-    let mut iter = hash.as_slice().iter().cycle();
-
-    let mut out_words = Vec::new();
-    for token in sentence.split_whitespace() {
-        let trimmed = token.trim_matches(|c: char| !c.is_ascii_alphabetic());
-        let start = token.find(trimmed).unwrap_or(0);
-        let end = start + trimmed.len();
-        let leading = &token[..start];
-        let trailing = &token[end..];
-        let mut word = String::new();
-        while word.len() < trimmed.len() {
-            if let Some(b) = iter.next() {
-                word.push_str(SYLLABLES[*b as usize]);
-            }
-        }
-        word.truncate(trimmed.len());
-        let word = if trimmed.chars().count() == 1 {
-            word.to_ascii_uppercase()
-        } else {
-            let mut chars = word.chars();
-            if let Some(first) = chars.next() {
-                let mut tmp = String::new();
-                tmp.push(first.to_ascii_uppercase());
-                tmp.extend(chars);
-                tmp
-            } else {
-                word
-            }
-        };
-        let mut rebuilt = String::new();
-        rebuilt.push_str(leading);
-        rebuilt.push_str(&word);
-        rebuilt.push_str(trailing);
-        out_words.push(rebuilt);
-    }
-
-    out_words.join(" ")
-}
-
-/// Obfuscate a lowercase Base32 string by hashing it with SHA3-256 and encoding
-/// the hash using lowercase Base32 without padding. The resulting string is
-/// truncated or repeated so that its length matches the input.
-pub fn obfuscate_base32_lowercase(input: &str) -> String {
-    let mut hasher = Sha3_256::new();
-    hasher.update(input.as_bytes());
-    let hash = hasher.finalize();
-
-    let encoded = BASE32_NOPAD.encode(hash.as_ref()).to_lowercase();
-    if encoded.len() >= input.len() {
-        encoded[..input.len()].to_string()
-    } else {
-        let mut out = String::with_capacity(input.len());
-        let mut iter = encoded.chars().cycle();
-        while out.len() < input.len() {
-            if let Some(ch) = iter.next() {
-                out.push(ch);
-            }
-        }
-        out
-    }
-}
-
-/// Obfuscate an uppercase Base32 string by hashing it with SHA3-256 and encoding
-/// the hash using uppercase Base32 without padding. The resulting string is
-/// truncated or repeated so that its length matches the input.
-pub fn obfuscate_base32_uppercase(input: &str) -> String {
-    let mut hasher = Sha3_256::new();
-    hasher.update(input.as_bytes());
-    let hash = hasher.finalize();
-
-    let encoded = BASE32_NOPAD.encode(hash.as_ref()).to_uppercase();
-    if encoded.len() >= input.len() {
-        encoded[..input.len()].to_string()
-    } else {
-        let mut out = String::with_capacity(input.len());
-        let mut iter = encoded.chars().cycle();
-        while out.len() < input.len() {
-            if let Some(ch) = iter.next() {
-                out.push(ch);
-            }
-        }
-        out
-    }
-}
-
 fn random_date_between_1970_and_now() -> DateTime<Utc> {
     let end = Utc::now().timestamp();
     let mut rng = rand::thread_rng();
@@ -357,18 +131,18 @@ fn random_date_between_1970_and_now() -> DateTime<Utc> {
 }
 
 lazy_static! {
-    pub static ref NEW_DATE_BASELINE: Mutex<DateTime<Utc>> =
+    pub(crate) static ref NEW_DATE_BASELINE: Mutex<DateTime<Utc>> =
         Mutex::new(random_date_between_1970_and_now());
     static ref ORIGINAL_DATE_BASELINE: Mutex<Option<DateTime<Utc>>> = Mutex::new(None);
 }
 
 #[cfg(test)]
 lazy_static! {
-    pub static ref DATE_TEST_GUARD: Mutex<()> = Mutex::new(());
+    pub(crate) static ref DATE_TEST_GUARD: Mutex<()> = Mutex::new(());
 }
 
 #[cfg(test)]
-pub fn set_date_baselines(new_base: DateTime<Utc>) {
+pub(crate) fn set_date_baselines(new_base: DateTime<Utc>) {
     let mut new_lock = NEW_DATE_BASELINE.lock().unwrap();
     *new_lock = new_base;
     let mut orig_lock = ORIGINAL_DATE_BASELINE.lock().unwrap();
@@ -377,7 +151,7 @@ pub fn set_date_baselines(new_base: DateTime<Utc>) {
 
 /// Detects whether the provided string is an ISO 8601 datetime with a trailing
 /// `Z` designator.
-pub fn is_iso8601_z_datetime(input: &str) -> bool {
+pub(crate) fn is_iso8601_z_datetime(input: &str) -> bool {
     if let Ok(dt) = DateTime::parse_from_rfc3339(input) {
         if input.ends_with('Z') {
             dt.with_timezone(&Utc)
@@ -394,7 +168,7 @@ pub fn is_iso8601_z_datetime(input: &str) -> bool {
 
 /// Obfuscate an ISO 8601 `Z` datetime by shifting it relative to runtime
 /// baselines. The resulting value remains a valid ISO 8601 `Z` datetime.
-pub fn obfuscate_iso8601_z_datetime(input: &str) -> String {
+pub(crate) fn obfuscate_iso8601_z_datetime(input: &str) -> String {
     let dt = DateTime::parse_from_rfc3339(input)
         .expect("invalid datetime")
         .with_timezone(&Utc);
@@ -419,25 +193,33 @@ lazy_static! {
 fn hash_strings(value: &mut Value) {
     match value {
         Value::String(s) => {
+            let hash = Sha3_256::digest(s.as_bytes());
             if is_alpha_word(s) {
-                *s = hash_word_to_syllables(s);
+                *s = hash_to_syllables(hash.as_slice(), s.len());
             } else if is_snake_case_word(s) {
-                *s = obfuscate_snake_case_word(s);
+                *s = hash_to_snake_case(s, hash.as_slice());
             } else if is_uppercase_word(s) {
-                *s = obfuscate_uppercase_word(s);
+                *s = hash_to_syllables(hash.as_slice(), s.len()).to_ascii_uppercase();
             } else if is_capitalized_word(s) {
-                *s = obfuscate_capitalized_word(s);
+                let hashed = hash_to_syllables(hash.as_slice(), s.len());
+                if hashed.is_empty() {
+                    *s = hashed;
+                } else {
+                    let mut chars = hashed.chars();
+                    if let Some(first) = chars.next() {
+                        *s = first.to_ascii_uppercase().to_string() + chars.as_str();
+                    } else {
+                        *s = hashed;
+                    }
+                }
             } else if is_iso8601_z_datetime(s) {
                 *s = obfuscate_iso8601_z_datetime(s);
             } else if is_base32_uppercase(s) {
-                *s = obfuscate_base32_uppercase(s);
+                *s = hash_to_base32_uppercase(hash.as_slice(), s.len());
             } else if is_base32_lowercase(s) {
-                *s = obfuscate_base32_lowercase(s);
+                *s = hash_to_base32_lowercase(hash.as_slice(), s.len());
             } else {
-                let mut hasher = Sha3_256::new();
-                hasher.update(s.as_bytes());
-                let result = hasher.finalize();
-                *s = hex::encode(result);
+                *s = hex::encode(hash.as_slice());
             }
         }
         Value::Array(arr) => {
@@ -451,6 +233,99 @@ fn hash_strings(value: &mut Value) {
             }
         }
         _ => {}
+    }
+}
+
+pub(crate) fn hash_to_syllables(hash: &[u8], len: usize) -> String {
+    let mut out = String::new();
+    for &b in hash {
+        out.push_str(SYLLABLES[b as usize]);
+    }
+    if out.len() >= len {
+        out.truncate(len);
+    } else {
+        while out.len() < len {
+            for &b in hash {
+                out.push_str(SYLLABLES[b as usize]);
+                if out.len() >= len {
+                    break;
+                }
+            }
+        }
+        out.truncate(len);
+    }
+    out
+}
+
+fn hash_to_syllable_vec(hash: &[u8], count: usize) -> Vec<&'static str> {
+    let mut out = Vec::with_capacity(count);
+    let mut iter = hash.iter().cycle();
+    for _ in 0..count {
+        if let Some(&b) = iter.next() {
+            out.push(SYLLABLES[b as usize]);
+        }
+    }
+    out
+}
+
+pub(crate) fn hash_to_snake_case(word: &str, hash: &[u8]) -> String {
+    let leading = word.chars().take_while(|&c| c == '_').count();
+    let trailing = word.chars().rev().take_while(|&c| c == '_').count();
+
+    let letters: String = word.chars().filter(|&c| c != '_').collect();
+    let syllable_count = rough_english_syllables(&letters).len();
+    let syllables = hash_to_syllable_vec(hash, syllable_count);
+
+    let mut parts = Vec::new();
+    let mut i = 0;
+    while i < syllables.len() {
+        let mut part = String::new();
+        part.push_str(syllables[i]);
+        if i + 1 < syllables.len() {
+            part.push_str(syllables[i + 1]);
+        }
+        parts.push(part);
+        i += 2;
+    }
+
+    let core = parts.join("_");
+
+    let mut out = String::new();
+    out.extend(std::iter::repeat_n('_', leading));
+    out.push_str(&core);
+    out.extend(std::iter::repeat_n('_', trailing));
+    out
+}
+
+pub(crate) fn hash_to_base32_lowercase(hash: &[u8], len: usize) -> String {
+    let encoded = BASE32_NOPAD.encode(hash).to_lowercase();
+    if encoded.len() >= len {
+        encoded[..len].to_string()
+    } else {
+        let mut out = String::with_capacity(len);
+        let mut iter = encoded.chars().cycle();
+        while out.len() < len {
+            if let Some(ch) = iter.next() {
+                out.push(ch);
+            }
+        }
+        out
+    }
+}
+
+pub(crate) fn hash_to_base32_uppercase(hash: &[u8], len: usize) -> String {
+    let encoded = BASE32_NOPAD.encode(hash).to_uppercase();
+    if encoded.len() >= len {
+        encoded[..len].to_string()
+    } else {
+        let mut out = String::with_capacity(len);
+        let mut iter = encoded.chars().cycle();
+        while out.len() < len {
+            if let Some(ch) = iter.next() {
+                out.push(ch);
+            }
+        }
+        out
     }
 }
 
@@ -538,6 +413,9 @@ pub fn run() -> io::Result<()> {
         _ => default_mode(),
     }
 }
+
+#[cfg(test)]
+mod cucumber_tests;
 
 #[cfg(test)]
 mod tests {
@@ -644,9 +522,9 @@ mod tests {
         assert_eq!(value["b"][0], json!("s"));
         assert_eq!(value["b"][1], json!(1));
         assert_eq!(value["c"]["d"], json!("i"));
-        assert_eq!(value["cap"], json!("Than"));
+        assert_eq!(value["cap"], json!("Boge"));
         assert_eq!(value["snake"], json!("utcont_stathim"));
-        assert_eq!(value["u"], json!("ELIKU"));
+        assert_eq!(value["u"], json!("ERGIL"));
         assert_eq!(value["b32u"], json!("VLDMNPOCMVCVJCXFTLDUCL74"));
     }
 
@@ -672,12 +550,12 @@ mod tests {
         const EXPECTED_HASHES: &str = r#"[
   {
     "additional_information": "4e9be9f98ffaf00dfa6849b118ec0eebaeb9d1fedf49794efc978549d692a644",
-    "category": "MANNO",
+    "category": "AGRWH",
     "created_at": "2000-01-01T00:00:00Z",
     "id": "rdhx3wx7qo75n46jwl4n7wijq5",
     "last_edited_by": "S4XGJ7ZPIXFYST6VJC552D35IM",
     "lower case word": "vericthesneup",
-    "title": "Butfa",
+    "title": "Danin",
     "updated_at": "2000-01-01T00:00:00Z",
     "urls": [
       {
@@ -688,7 +566,7 @@ mod tests {
     ],
     "vault": {
       "id": "ynbhwzbd65ufp2foibsrlbv6js",
-      "name": "Hedencont"
+      "name": "Suchardwi"
     },
     "version": 1
   }
@@ -738,14 +616,6 @@ mod tests {
     }
 
     #[test]
-    fn test_is_title_case_sentence_examples() {
-        assert!(is_title_case_sentence("A Title Case Sentence"));
-        assert!(!is_title_case_sentence("A title Case"));
-        assert!(!is_title_case_sentence("A"));
-        assert!(!is_title_case_sentence(""));
-    }
-
-    #[test]
     fn test_is_base32_lowercase_examples() {
         assert!(is_base32_lowercase("mfrggzdfmztwq2lknnwg23tp"));
         assert!(!is_base32_lowercase("MFRGGZDFMZTWQ2LKNNWG23TP"));
@@ -756,7 +626,8 @@ mod tests {
     #[test]
     fn test_obfuscate_base32_lowercase_preserves_class() {
         let value = "mfrggzdfmztwq2lknnwg23tp";
-        let obf = obfuscate_base32_lowercase(value);
+        let hash = Sha3_256::digest(value.as_bytes());
+        let obf = hash_to_base32_lowercase(hash.as_slice(), value.len());
         assert!(is_base32_lowercase(&obf));
         assert_eq!(obf.len(), value.len());
     }
@@ -771,7 +642,8 @@ mod tests {
     #[test]
     fn test_obfuscate_base32_uppercase_preserves_class() {
         let value = "MFRGGZDFMZTWQ2LKNNWG23TP";
-        let obf = obfuscate_base32_uppercase(value);
+        let hash = Sha3_256::digest(value.as_bytes());
+        let obf = hash_to_base32_uppercase(hash.as_slice(), value.len());
         assert!(is_base32_uppercase(&obf));
         assert!(!is_base32_lowercase(&obf));
         assert_eq!(obf.len(), value.len());
@@ -793,9 +665,6 @@ mod tests {
             if is_snake_case_word(example.input) {
                 detected.insert("snake_case_word");
             }
-            if is_title_case_sentence(example.input) {
-                detected.insert("title_case_sentence");
-            }
             if is_iso8601_z_datetime(example.input) {
                 detected.insert("iso8601_z_datetime");
             }
@@ -815,16 +684,34 @@ mod tests {
         let _guard = DATE_TEST_GUARD.lock().unwrap();
         reset_date_baselines();
         for example in WELL_KNOWN_INPUTS {
+            let hash = Sha3_256::digest(example.input.as_bytes());
             for &name in example.detectors {
                 let obf = match name {
-                    "alpha_word" => hash_word_to_syllables(example.input),
-                    "uppercase_word" => obfuscate_uppercase_word(example.input),
-                    "capitalized_word" => obfuscate_capitalized_word(example.input),
-                    "snake_case_word" => obfuscate_snake_case_word(example.input),
-                    "title_case_sentence" => obfuscate_title_case_sentence(example.input),
+                    "alpha_word" => hash_to_syllables(hash.as_slice(), example.input.len()),
+                    "uppercase_word" => {
+                        hash_to_syllables(hash.as_slice(), example.input.len()).to_ascii_uppercase()
+                    }
+                    "capitalized_word" => {
+                        let hashed = hash_to_syllables(hash.as_slice(), example.input.len());
+                        if hashed.is_empty() {
+                            hashed
+                        } else {
+                            let mut chars = hashed.chars();
+                            let first = chars.next().unwrap().to_ascii_uppercase();
+                            let mut out = String::new();
+                            out.push(first);
+                            out.extend(chars);
+                            out
+                        }
+                    }
+                    "snake_case_word" => hash_to_snake_case(example.input, hash.as_slice()),
                     "iso8601_z_datetime" => obfuscate_iso8601_z_datetime(example.input),
-                    "base32_lowercase" => obfuscate_base32_lowercase(example.input),
-                    "base32_uppercase" => obfuscate_base32_uppercase(example.input),
+                    "base32_lowercase" => {
+                        hash_to_base32_lowercase(hash.as_slice(), example.input.len())
+                    }
+                    "base32_uppercase" => {
+                        hash_to_base32_uppercase(hash.as_slice(), example.input.len())
+                    }
                     _ => continue,
                 };
                 let valid = match name {
@@ -832,7 +719,6 @@ mod tests {
                     "uppercase_word" => is_uppercase_word(&obf),
                     "capitalized_word" => is_capitalized_word(&obf),
                     "snake_case_word" => is_snake_case_word(&obf),
-                    "title_case_sentence" => is_title_case_sentence(&obf),
                     "iso8601_z_datetime" => is_iso8601_z_datetime(&obf),
                     "base32_lowercase" => is_base32_lowercase(&obf),
                     "base32_uppercase" => is_base32_uppercase(&obf),
