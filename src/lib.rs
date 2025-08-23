@@ -825,16 +825,35 @@ mod tests {
         let _guard = DATE_TEST_GUARD.lock().unwrap();
         reset_date_baselines();
         for example in WELL_KNOWN_INPUTS {
+            let hash = Sha3_256::digest(example.input.as_bytes());
             for &name in example.detectors {
                 let obf = match name {
-                    "alpha_word" => hash_word_to_syllables(example.input),
-                    "uppercase_word" => obfuscate_uppercase_word(example.input),
-                    "capitalized_word" => obfuscate_capitalized_word(example.input),
-                    "snake_case_word" => obfuscate_snake_case_word(example.input),
+                    "alpha_word" => hash_to_syllables(hash.as_slice(), example.input.len()),
+                    "uppercase_word" => {
+                        hash_to_syllables(hash.as_slice(), example.input.len()).to_ascii_uppercase()
+                    }
+                    "capitalized_word" => {
+                        let hashed = hash_to_syllables(hash.as_slice(), example.input.len());
+                        if hashed.is_empty() {
+                            hashed
+                        } else {
+                            let mut chars = hashed.chars();
+                            let first = chars.next().unwrap().to_ascii_uppercase();
+                            let mut out = String::new();
+                            out.push(first);
+                            out.extend(chars);
+                            out
+                        }
+                    }
+                    "snake_case_word" => hash_to_snake_case(example.input, hash.as_slice()),
                     "title_case_sentence" => obfuscate_title_case_sentence(example.input),
                     "iso8601_z_datetime" => obfuscate_iso8601_z_datetime(example.input),
-                    "base32_lowercase" => obfuscate_base32_lowercase(example.input),
-                    "base32_uppercase" => obfuscate_base32_uppercase(example.input),
+                    "base32_lowercase" => {
+                        hash_to_base32_lowercase(hash.as_slice(), example.input.len())
+                    }
+                    "base32_uppercase" => {
+                        hash_to_base32_uppercase(hash.as_slice(), example.input.len())
+                    }
                     _ => continue,
                 };
                 let valid = match name {
