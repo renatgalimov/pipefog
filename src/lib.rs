@@ -7,6 +7,8 @@ use serde_json::{Deserializer, Value};
 use sha3::{Digest, Sha3_256};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
+use std::sync::RwLock;
+#[cfg(test)]
 use std::sync::Mutex;
 
 /// Syllables used for obfuscating lowercase words.
@@ -131,9 +133,9 @@ fn random_date_between_1970_and_now() -> DateTime<Utc> {
 }
 
 lazy_static! {
-    pub(crate) static ref NEW_DATE_BASELINE: Mutex<DateTime<Utc>> =
-        Mutex::new(random_date_between_1970_and_now());
-    static ref ORIGINAL_DATE_BASELINE: Mutex<Option<DateTime<Utc>>> = Mutex::new(None);
+    pub(crate) static ref NEW_DATE_BASELINE: RwLock<DateTime<Utc>> =
+        RwLock::new(random_date_between_1970_and_now());
+    static ref ORIGINAL_DATE_BASELINE: RwLock<Option<DateTime<Utc>>> = RwLock::new(None);
 }
 
 #[cfg(test)]
@@ -143,16 +145,29 @@ lazy_static! {
 
 #[cfg(test)]
 pub(crate) fn set_date_baselines(new_base: DateTime<Utc>) {
-    let mut new_lock = NEW_DATE_BASELINE.lock().unwrap();
-    *new_lock = new_base;
-    let mut orig_lock = ORIGINAL_DATE_BASELINE.lock().unwrap();
-    *orig_lock = None;
+    *NEW_DATE_BASELINE.write().expect("failed to write NEW_DATE_BASELINE") = new_base;
+    *ORIGINAL_DATE_BASELINE.write().expect("failed to write ORIGINAL_DATE_BASELINE") = None;
 }
 
 /// Attempts to parse a datetime string and returns the parsed datetime
 /// along with the output format string to use for formatting.
 /// Returns None if the input doesn't match any supported datetime format.
 pub(crate) fn to_datetime(input: &str) -> Option<(DateTime<FixedOffset>, &'static str)> {
+    // Try space + offset + microseconds format: "2025-12-29 13:18:43.470684+00:00"
+    if input.contains('.') {
+        if let Ok(parsed_datetime) = DateTime::parse_from_str(input, "%Y-%m-%d %H:%M:%S%.f%z") {
+            let output_format = "%Y-%m-%d %H:%M:%S%.6f%:z";
+            let formatted = parsed_datetime.format(output_format).to_string();
+            assert!(
+                formatted == input,
+                "Round-trip formatting failed for space+offset+microseconds format: input='{}', formatted='{}'",
+                input,
+                formatted
+            );
+            return Some((parsed_datetime, output_format));
+        }
+    }
+
     // Try space + offset format: "2025-10-02 17:41:16+00:00"
     if let Ok(parsed_datetime) = DateTime::parse_from_str(input, "%Y-%m-%d %H:%M:%S%z") {
         let output_format = "%Y-%m-%d %H:%M:%S%:z";
@@ -164,6 +179,34 @@ pub(crate) fn to_datetime(input: &str) -> Option<(DateTime<FixedOffset>, &'stati
             formatted
         );
         return Some((parsed_datetime, output_format));
+    }
+
+    // Try T + Z format with fractional seconds: "2025-12-29T13:18:43.470Z"
+    if input.ends_with('Z') && input.contains('.') {
+        let with_offset = input.replace('Z', "+00:00");
+        if let Ok(parsed_datetime) = DateTime::parse_from_str(&with_offset, "%Y-%m-%dT%H:%M:%S%.f%z") {
+            // Count decimal places to determine output format
+            if let Some(dot_pos) = input.rfind('.') {
+                let decimal_part = &input[dot_pos + 1..input.len() - 1]; // -1 to exclude 'Z'
+                let precision = decimal_part.len();
+                let output_format = match precision {
+                    3 => "%Y-%m-%dT%H:%M:%S%.3fZ",
+                    6 => "%Y-%m-%dT%H:%M:%S%.6fZ",
+                    _ => "%Y-%m-%dT%H:%M:%S%.fZ",
+                };
+                let formatted = parsed_datetime
+                    .with_timezone(&Utc)
+                    .format(output_format)
+                    .to_string();
+                assert!(
+                    formatted == input,
+                    "Round-trip formatting failed for T+Z+fractional format: input='{}', formatted='{}'",
+                    input,
+                    formatted
+                );
+                return Some((parsed_datetime, output_format));
+            }
+        }
     }
 
     // Try T + Z format: "2025-05-07T11:58:32Z"
@@ -198,10 +241,10 @@ pub(crate) fn obfuscate_datetime(parsed_datetime: DateTime<FixedOffset>, output_
     // Convert to UTC for baseline calculation
     let datetime_utc = parsed_datetime.with_timezone(&Utc);
 
-    // Get or set the ORIGINAL_DATE_BASELINE
+    // Get or set the ORIGINAL_DATE_BASELINE (use write lock since we might need to write)
     let mut original_baseline = ORIGINAL_DATE_BASELINE
-        .lock()
-        .expect("failed to lock ORIGINAL_DATE_BASELINE");
+        .write()
+        .expect("failed to write ORIGINAL_DATE_BASELINE");
     let original_datetime = match *original_baseline {
         Some(ref original_datetime) => *original_datetime,
         None => {
@@ -209,14 +252,15 @@ pub(crate) fn obfuscate_datetime(parsed_datetime: DateTime<FixedOffset>, output_
             datetime_utc
         }
     };
+    drop(original_baseline); // Release write lock early
 
     // Calculate the delta from original baseline
     let delta = original_datetime - datetime_utc;
 
-    // Apply delta to NEW_DATE_BASELINE
+    // Apply delta to NEW_DATE_BASELINE (read-only access)
     let new_datetime_baseline = *NEW_DATE_BASELINE
-        .lock()
-        .expect("failed to lock NEW_DATE_BASELINE");
+        .read()
+        .expect("failed to read NEW_DATE_BASELINE");
     let new_datetime_utc = new_datetime_baseline + delta;
 
     // Convert back to the original timezone offset
@@ -788,6 +832,20 @@ mod tests {
     }
 
     #[test]
+    fn test_to_datetime_when_microseconds_format_should_return_datetime_and_format() {
+        let (datetime, format) = to_datetime("2025-12-29 13:18:43.470684+00:00").expect("should parse");
+        assert_eq!(format, "%Y-%m-%d %H:%M:%S%.6f%:z");
+        assert_eq!(datetime.format(format).to_string(), "2025-12-29 13:18:43.470684+00:00");
+    }
+
+    #[test]
+    fn test_to_datetime_when_t_z_milliseconds_format_should_return_datetime_and_format() {
+        let (datetime, format) = to_datetime("2025-12-29T13:18:43.470Z").expect("should parse");
+        assert_eq!(format, "%Y-%m-%dT%H:%M:%S%.3fZ");
+        assert_eq!(datetime.format(format).to_string(), "2025-12-29T13:18:43.470Z");
+    }
+
+    #[test]
     fn test_to_datetime_when_invalid_should_return_none() {
         assert_eq!(to_datetime("2022-05-16"), None);
         assert_eq!(to_datetime("not-a-date"), None);
@@ -822,5 +880,27 @@ mod tests {
         let (datetime2, format2) = to_datetime("2025-10-02 17:41:16-05:00").unwrap();
         let obfuscated2 = obfuscate_datetime(datetime2, format2);
         assert!(obfuscated2.ends_with("-05:00"));
+    }
+
+    #[test]
+    fn test_obfuscate_datetime_when_microseconds_format_should_preserve_precision() {
+        let _guard = DATE_TEST_GUARD.lock().unwrap();
+        reset_date_baselines();
+
+        let (datetime, format) = to_datetime("2025-12-29 13:18:43.470684+00:00").unwrap();
+        let obfuscated = obfuscate_datetime(datetime, format);
+
+        assert_eq!(obfuscated, "2000-01-01 00:00:00.000000+00:00");
+    }
+
+    #[test]
+    fn test_obfuscate_datetime_when_t_z_milliseconds_format_should_preserve_format() {
+        let _guard = DATE_TEST_GUARD.lock().unwrap();
+        reset_date_baselines();
+
+        let (datetime, format) = to_datetime("2025-12-29T13:18:43.470Z").unwrap();
+        let obfuscated = obfuscate_datetime(datetime, format);
+
+        assert_eq!(obfuscated, "2000-01-01T00:00:00.000Z");
     }
 }
