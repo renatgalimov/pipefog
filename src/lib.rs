@@ -1,4 +1,4 @@
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use data_encoding::BASE32_NOPAD;
 use lazy_static::lazy_static;
 use rand::Rng;
@@ -149,41 +149,81 @@ pub(crate) fn set_date_baselines(new_base: DateTime<Utc>) {
     *orig_lock = None;
 }
 
-/// Detects whether the provided string is an ISO 8601 datetime with a trailing
-/// `Z` designator.
-pub(crate) fn is_iso8601_z_datetime(input: &str) -> bool {
-    if let Ok(dt) = DateTime::parse_from_rfc3339(input) {
-        if input.ends_with('Z') {
-            dt.with_timezone(&Utc)
-                .format("%Y-%m-%dT%H:%M:%SZ")
-                .to_string()
-                == input
-        } else {
-            false
-        }
-    } else {
-        false
+/// Attempts to parse a datetime string and returns the parsed datetime
+/// along with the output format string to use for formatting.
+/// Returns None if the input doesn't match any supported datetime format.
+pub(crate) fn to_datetime(input: &str) -> Option<(DateTime<FixedOffset>, &'static str)> {
+    // Try space + offset format: "2025-10-02 17:41:16+00:00"
+    if let Ok(parsed_datetime) = DateTime::parse_from_str(input, "%Y-%m-%d %H:%M:%S%z") {
+        let output_format = "%Y-%m-%d %H:%M:%S%:z";
+        let formatted = parsed_datetime.format(output_format).to_string();
+        assert!(
+            formatted == input,
+            "Round-trip formatting failed for space+offset format: input='{}', formatted='{}'",
+            input,
+            formatted
+        );
+        return Some((parsed_datetime, output_format));
     }
+
+    // Try T + Z format: "2025-05-07T11:58:32Z"
+    if input.ends_with('Z') && input.len() == 20 {
+        // Replace Z with +00:00 for parsing
+        let with_offset = input.replace('Z', "+00:00");
+        if let Ok(parsed_datetime) = DateTime::parse_from_str(&with_offset, "%Y-%m-%dT%H:%M:%S%z") {
+            let output_format = "%Y-%m-%dT%H:%M:%SZ";
+            let formatted = parsed_datetime
+                .with_timezone(&Utc)
+                .format(output_format)
+                .to_string();
+            assert!(
+                formatted == input,
+                "Round-trip formatting failed for T+Z format: input='{}', formatted='{}'",
+                input,
+                formatted
+            );
+            return Some((parsed_datetime, output_format));
+        }
+    }
+
+    None
 }
 
-/// Obfuscate an ISO 8601 `Z` datetime by shifting it relative to runtime
-/// baselines. The resulting value remains a valid ISO 8601 `Z` datetime.
-pub(crate) fn obfuscate_iso8601_z_datetime(input: &str) -> String {
-    let dt = DateTime::parse_from_rfc3339(input)
-        .expect("invalid datetime")
-        .with_timezone(&Utc);
-    let mut orig = ORIGINAL_DATE_BASELINE.lock().unwrap();
-    let orig_dt = match *orig {
-        Some(ref orig_dt) => *orig_dt,
+/// Obfuscate a datetime by shifting it relative to runtime baselines.
+/// The resulting value preserves the exact format of the input.
+pub(crate) fn obfuscate_datetime(parsed_datetime: DateTime<FixedOffset>, output_format: &str) -> String {
+    // Extract the original timezone offset for later preservation
+    let original_offset = parsed_datetime.offset().clone();
+
+    // Convert to UTC for baseline calculation
+    let datetime_utc = parsed_datetime.with_timezone(&Utc);
+
+    // Get or set the ORIGINAL_DATE_BASELINE
+    let mut original_baseline = ORIGINAL_DATE_BASELINE
+        .lock()
+        .expect("failed to lock ORIGINAL_DATE_BASELINE");
+    let original_datetime = match *original_baseline {
+        Some(ref original_datetime) => *original_datetime,
         None => {
-            *orig = Some(dt);
-            dt
+            *original_baseline = Some(datetime_utc);
+            datetime_utc
         }
     };
-    let delta = orig_dt - dt;
-    let new_dt_base = *NEW_DATE_BASELINE.lock().unwrap();
-    let new_dt = new_dt_base + delta;
-    new_dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()
+
+    // Calculate the delta from original baseline
+    let delta = original_datetime - datetime_utc;
+
+    // Apply delta to NEW_DATE_BASELINE
+    let new_datetime_baseline = *NEW_DATE_BASELINE
+        .lock()
+        .expect("failed to lock NEW_DATE_BASELINE");
+    let new_datetime_utc = new_datetime_baseline + delta;
+
+    // Convert back to the original timezone offset
+    let new_datetime_with_offset = new_datetime_utc.with_timezone(&original_offset);
+
+    // Format using the output format string
+    new_datetime_with_offset.format(output_format).to_string()
 }
 
 lazy_static! {
@@ -212,8 +252,8 @@ fn hash_strings(value: &mut Value) {
                         *s = hashed;
                     }
                 }
-            } else if is_iso8601_z_datetime(s) {
-                *s = obfuscate_iso8601_z_datetime(s);
+            } else if let Some((datetime, format)) = to_datetime(s) {
+                *s = obfuscate_datetime(datetime, format);
             } else if is_base32_uppercase(s) {
                 *s = hash_to_base32_uppercase(hash.as_slice(), s.len());
             } else if is_base32_lowercase(s) {
@@ -239,14 +279,14 @@ fn hash_strings(value: &mut Value) {
 pub(crate) fn hash_to_syllables(hash: &[u8], len: usize) -> String {
     let mut out = String::new();
     for &b in hash {
-        out.push_str(SYLLABLES[b as usize]);
+        out.push_str(SYLLABLES[b as usize].trim());
     }
     if out.len() >= len {
         out.truncate(len);
     } else {
         while out.len() < len {
             for &b in hash {
-                out.push_str(SYLLABLES[b as usize]);
+                out.push_str(SYLLABLES[b as usize].trim());
                 if out.len() >= len {
                     break;
                 }
@@ -280,9 +320,9 @@ pub(crate) fn hash_to_snake_case(word: &str, hash: &[u8]) -> String {
     let mut i = 0;
     while i < syllables.len() {
         let mut part = String::new();
-        part.push_str(syllables[i]);
+        part.push_str(syllables[i].trim());
         if i + 1 < syllables.len() {
-            part.push_str(syllables[i + 1]);
+            part.push_str(syllables[i + 1].trim());
         }
         parts.push(part);
         i += 2;
@@ -574,9 +614,7 @@ mod tests {
         assert_eq!(hashes, EXPECTED_HASHES);
         let obj = hashed_sample.as_array().unwrap()[0].as_object().unwrap();
         let created = obj.get("created_at").unwrap().as_str().unwrap();
-        assert!(is_iso8601_z_datetime(created));
         let updated = obj.get("updated_at").unwrap().as_str().unwrap();
-        assert!(is_iso8601_z_datetime(updated));
         assert_eq!(created, updated);
     }
 
@@ -665,8 +703,8 @@ mod tests {
             if is_snake_case_word(example.input) {
                 detected.insert("snake_case_word");
             }
-            if is_iso8601_z_datetime(example.input) {
-                detected.insert("iso8601_z_datetime");
+            if to_datetime(example.input).is_some() {
+                detected.insert("datetime");
             }
             if is_base32_lowercase(example.input) {
                 detected.insert("base32_lowercase");
@@ -705,7 +743,13 @@ mod tests {
                         }
                     }
                     "snake_case_word" => hash_to_snake_case(example.input, hash.as_slice()),
-                    "iso8601_z_datetime" => obfuscate_iso8601_z_datetime(example.input),
+                    "datetime" => {
+                        if let Some((datetime, format)) = to_datetime(example.input) {
+                            obfuscate_datetime(datetime, format)
+                        } else {
+                            panic!("Failed to parse datetime: {}", example.input);
+                        }
+                    }
                     "base32_lowercase" => {
                         hash_to_base32_lowercase(hash.as_slice(), example.input.len())
                     }
@@ -719,7 +763,7 @@ mod tests {
                     "uppercase_word" => is_uppercase_word(&obf),
                     "capitalized_word" => is_capitalized_word(&obf),
                     "snake_case_word" => is_snake_case_word(&obf),
-                    "iso8601_z_datetime" => is_iso8601_z_datetime(&obf),
+                    "datetime" => to_datetime(&obf).is_some(),
                     "base32_lowercase" => is_base32_lowercase(&obf),
                     "base32_uppercase" => is_base32_uppercase(&obf),
                     _ => false,
@@ -730,36 +774,53 @@ mod tests {
     }
 
     #[test]
-    fn test_is_iso8601_z_datetime_examples() {
-        assert!(is_iso8601_z_datetime("2022-05-16T22:39:20Z"));
-        assert!(!is_iso8601_z_datetime("2022-05-16T22:39:20+02:00"));
-        assert!(!is_iso8601_z_datetime("2022-05-16"));
-        assert!(!is_iso8601_z_datetime("not-a-date"));
+    fn test_to_datetime_when_z_format_should_return_datetime_and_format() {
+        let (datetime, format) = to_datetime("2022-05-16T22:39:20Z").expect("should parse");
+        assert_eq!(format, "%Y-%m-%dT%H:%M:%SZ");
+        assert_eq!(datetime.to_rfc3339(), "2022-05-16T22:39:20+00:00");
     }
 
     #[test]
-    fn test_obfuscate_iso8601_z_datetime_preserves_class() {
+    fn test_to_datetime_when_offset_format_should_return_datetime_and_format() {
+        let (datetime, format) = to_datetime("2025-10-02 17:41:16+00:00").expect("should parse");
+        assert_eq!(format, "%Y-%m-%d %H:%M:%S%:z");
+        assert_eq!(datetime.format(format).to_string(), "2025-10-02 17:41:16+00:00");
+    }
+
+    #[test]
+    fn test_to_datetime_when_invalid_should_return_none() {
+        assert_eq!(to_datetime("2022-05-16"), None);
+        assert_eq!(to_datetime("not-a-date"), None);
+        assert_eq!(to_datetime("2022-05-16T22:39:20+02:00"), None);
+    }
+
+    #[test]
+    fn test_obfuscate_datetime_when_z_format_should_preserve_delta() {
         let _guard = DATE_TEST_GUARD.lock().unwrap();
         reset_date_baselines();
-        let first = "2022-05-16T22:39:20Z";
-        let second = "2022-05-15T22:39:20Z";
-        let obf_first = obfuscate_iso8601_z_datetime(first);
-        let obf_second = obfuscate_iso8601_z_datetime(second);
-        assert!(is_iso8601_z_datetime(&obf_first));
-        assert!(is_iso8601_z_datetime(&obf_second));
-        let obf_first_dt = chrono::DateTime::parse_from_rfc3339(&obf_first)
-            .unwrap()
-            .with_timezone(&Utc);
-        let obf_second_dt = chrono::DateTime::parse_from_rfc3339(&obf_second)
-            .unwrap()
-            .with_timezone(&Utc);
-        let first_dt = chrono::DateTime::parse_from_rfc3339(first)
-            .unwrap()
-            .with_timezone(&Utc);
-        let second_dt = chrono::DateTime::parse_from_rfc3339(second)
-            .unwrap()
-            .with_timezone(&Utc);
-        assert_eq!(obf_first_dt, *NEW_DATE_BASELINE.lock().unwrap());
-        assert_eq!(obf_second_dt - obf_first_dt, first_dt - second_dt);
+
+        let (first_datetime, first_format) = to_datetime("2022-05-16T22:39:20Z").unwrap();
+        let (second_datetime, second_format) = to_datetime("2022-05-15T22:39:20Z").unwrap();
+
+        let obfuscated_first = obfuscate_datetime(first_datetime, first_format);
+        let obfuscated_second = obfuscate_datetime(second_datetime, second_format);
+
+        assert_eq!(obfuscated_first, "2000-01-01T00:00:00Z");
+        assert_eq!(obfuscated_second, "2000-01-02T00:00:00Z");
+    }
+
+    #[test]
+    fn test_obfuscate_datetime_when_offset_format_should_preserve_offset() {
+        let _guard = DATE_TEST_GUARD.lock().unwrap();
+        reset_date_baselines();
+
+        let (datetime1, format1) = to_datetime("2025-10-02 17:41:16+00:00").unwrap();
+        let obfuscated1 = obfuscate_datetime(datetime1, format1);
+        assert!(obfuscated1.ends_with("+00:00"));
+
+        reset_date_baselines();
+        let (datetime2, format2) = to_datetime("2025-10-02 17:41:16-05:00").unwrap();
+        let obfuscated2 = obfuscate_datetime(datetime2, format2);
+        assert!(obfuscated2.ends_with("-05:00"));
     }
 }

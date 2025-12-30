@@ -13,3 +13,6 @@ Feature: Obfuscation preserves classification
       | snake_case_word     | snake_case_word          |
       | base32_lowercase    | mfrggzdfmztwq2lknnwg23tp |
       | base32_uppercase    | MFRGGZDFMZTWQ2LKNNWG23TP |
+      | datetime            | 2025-10-02 17:41:16+00:00|
+      | datetime            | 2022-05-16 22:39:20-05:00|
+      | datetime            | 2022-05-16T22:39:20Z     |

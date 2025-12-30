@@ -22,7 +22,15 @@ pub const WELL_KNOWN_INPUTS: &[Example] = &[
     },
     Example {
         input: "2022-05-16T22:39:20Z",
-        detectors: &["iso8601_z_datetime"],
+        detectors: &["datetime"],
+    },
+    Example {
+        input: "2025-10-02 17:41:16+00:00",
+        detectors: &["datetime"],
+    },
+    Example {
+        input: "2022-05-16 22:39:20-05:00",
+        detectors: &["datetime"],
     },
     Example {
         input: "mfrggzdfmztwq2lknnwg23tp",
