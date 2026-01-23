@@ -383,7 +383,9 @@ pub(crate) fn hash_to_snake_case(word: &str, hash: &[u8]) -> String {
 
     let letters: String = word.chars().filter(|&c| c != '_').collect();
     let syllable_count = rough_english_syllables(&letters).len();
-    let syllables = hash_to_syllable_vec(hash, syllable_count);
+    // Ensure at least 2 syllables so we get at least one underscore in output
+    let actual_syllable_count = syllable_count.max(2);
+    let syllables = hash_to_syllable_vec(hash, actual_syllable_count);
 
     let mut parts = Vec::new();
     let mut i = 0;
@@ -395,6 +397,21 @@ pub(crate) fn hash_to_snake_case(word: &str, hash: &[u8]) -> String {
         }
         parts.push(part);
         i += 2;
+    }
+
+    // Ensure at least 2 parts so we always have an underscore
+    if parts.len() == 1 {
+        let single = parts.remove(0);
+        let mid = single.len() / 2;
+        if mid > 0 {
+            parts.push(single[..mid].to_string());
+            parts.push(single[mid..].to_string());
+        } else {
+            // Fallback: use hash to generate a second part
+            let extra = hash_to_syllable_vec(&hash[16..], 1);
+            parts.push(single);
+            parts.push(extra[0].trim().to_string());
+        }
     }
 
     let core = parts.join("_");
@@ -743,6 +760,7 @@ mod tests {
         assert!(!is_snake_case_word("Snake_Case"));
         assert!(!is_snake_case_word("snake-case"));
         assert!(!is_snake_case_word("snake case"));
+        assert!(!is_snake_case_word(""));
     }
 
     #[test]

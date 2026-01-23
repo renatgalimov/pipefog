@@ -1,0 +1,21 @@
+coverage:
+  status:
+    project:
+      default:
+        # Overall project coverage - informational
+        informational: true
+    patch:
+      default:
+        # Require 80% coverage on new/changed code
+        target: 80%
+        # Fail PR if new code doesn't meet threshold
+        informational: false
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: true
+
+ignore:
+  - "tests/**/*"
+  - "**/cucumber_tests.rs"
