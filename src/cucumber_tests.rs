@@ -1,6 +1,5 @@
 use chrono::TimeZone;
 use cucumber::{given, then, when, World};
-use sha3::{Digest, Sha3_256};
 
 #[derive(Debug, Default, World)]
 struct TestWorld {
@@ -15,14 +14,15 @@ async fn the_input(world: &mut TestWorld, input: String) {
 
 #[when(regex = r#"^I obfuscate it as (\w+)$"#)]
 async fn i_obfuscate_it(world: &mut TestWorld, detector: String) {
-    let hash = Sha3_256::digest(world.input.as_bytes());
+    let input_len = world.input.len();
+    let hash = crate::shake256_hash(world.input.as_bytes(), input_len.max(32));
     world.obfuscated = match detector.as_str() {
-        "alpha_word" => crate::hash_to_syllables(hash.as_slice(), world.input.len()),
+        "alpha_word" => crate::hash_to_syllables(&hash, input_len),
         "uppercase_word" => {
-            crate::hash_to_syllables(hash.as_slice(), world.input.len()).to_ascii_uppercase()
+            crate::hash_to_syllables(&hash, input_len).to_ascii_uppercase()
         }
         "capitalized_word" => {
-            let hashed = crate::hash_to_syllables(hash.as_slice(), world.input.len());
+            let hashed = crate::hash_to_syllables(&hash, input_len);
             if hashed.is_empty() {
                 hashed
             } else {
@@ -34,9 +34,9 @@ async fn i_obfuscate_it(world: &mut TestWorld, detector: String) {
                 out
             }
         }
-        "snake_case_word" => crate::hash_to_snake_case(&world.input, hash.as_slice()),
-        "base32_lowercase" => crate::hash_to_base32_lowercase(hash.as_slice(), world.input.len()),
-        "base32_uppercase" => crate::hash_to_base32_uppercase(hash.as_slice(), world.input.len()),
+        "snake_case_word" => crate::hash_to_snake_case(&world.input, &hash),
+        "base32_lowercase" => crate::hash_to_base32_lowercase(&hash, input_len),
+        "base32_uppercase" => crate::hash_to_base32_uppercase(&hash, input_len),
         "datetime" => {
             let _guard = crate::DATE_TEST_GUARD
                 .lock()
@@ -48,7 +48,7 @@ async fn i_obfuscate_it(world: &mut TestWorld, detector: String) {
                 world.input.clone()
             }
         }
-        "email" => crate::hash_to_email(hash.as_slice()),
+        "email" => crate::hash_to_email(&hash),
         _ => world.input.clone(),
     };
 }

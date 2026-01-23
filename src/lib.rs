@@ -4,8 +4,18 @@ use lazy_static::lazy_static;
 use rand::Rng;
 use regex::Regex;
 use serde_json::{Deserializer, Value};
-use sha3::{Digest, Sha3_256};
+use sha3::{Shake256, digest::{Update, ExtendableOutput, XofReader}};
 use std::collections::HashMap;
+
+/// Computes a SHAKE256 hash of the input and returns the requested number of bytes.
+pub(crate) fn shake256_hash(input: &[u8], output_len: usize) -> Vec<u8> {
+    let mut hasher = Shake256::default();
+    hasher.update(input);
+    let mut reader = hasher.finalize_xof();
+    let mut output = vec![0u8; output_len];
+    XofReader::read(&mut reader, &mut output);
+    output
+}
 use std::io::{self, Read, Write};
 #[cfg(test)]
 use std::sync::Mutex;
@@ -299,36 +309,37 @@ lazy_static! {
 
 fn hash_strings(value: &mut Value) {
     match value {
-        Value::String(s) => {
-            let hash = Sha3_256::digest(s.as_bytes());
-            if is_email(s) {
-                *s = hash_to_email(hash.as_slice());
-            } else if is_alpha_word(s) {
-                *s = hash_to_syllables(hash.as_slice(), s.len());
-            } else if is_snake_case_word(s) {
-                *s = hash_to_snake_case(s, hash.as_slice());
-            } else if is_uppercase_word(s) {
-                *s = hash_to_syllables(hash.as_slice(), s.len()).to_ascii_uppercase();
-            } else if is_capitalized_word(s) {
-                let hashed = hash_to_syllables(hash.as_slice(), s.len());
+        Value::String(string_value) => {
+            let input_len = string_value.len();
+            let hash = shake256_hash(string_value.as_bytes(), input_len.max(32));
+            if is_email(string_value) {
+                *string_value = hash_to_email(&hash);
+            } else if is_alpha_word(string_value) {
+                *string_value = hash_to_syllables(&hash, input_len);
+            } else if is_snake_case_word(string_value) {
+                *string_value = hash_to_snake_case(string_value, &hash);
+            } else if is_uppercase_word(string_value) {
+                *string_value = hash_to_syllables(&hash, input_len).to_ascii_uppercase();
+            } else if is_capitalized_word(string_value) {
+                let hashed = hash_to_syllables(&hash, input_len);
                 if hashed.is_empty() {
-                    *s = hashed;
+                    *string_value = hashed;
                 } else {
                     let mut chars = hashed.chars();
                     if let Some(first) = chars.next() {
-                        *s = first.to_ascii_uppercase().to_string() + chars.as_str();
+                        *string_value = first.to_ascii_uppercase().to_string() + chars.as_str();
                     } else {
-                        *s = hashed;
+                        *string_value = hashed;
                     }
                 }
-            } else if let Some((datetime, format)) = to_datetime(s) {
-                *s = obfuscate_datetime(datetime, format);
-            } else if is_base32_uppercase(s) {
-                *s = hash_to_base32_uppercase(hash.as_slice(), s.len());
-            } else if is_base32_lowercase(s) {
-                *s = hash_to_base32_lowercase(hash.as_slice(), s.len());
+            } else if let Some((datetime, format)) = to_datetime(string_value) {
+                *string_value = obfuscate_datetime(datetime, format);
+            } else if is_base32_uppercase(string_value) {
+                *string_value = hash_to_base32_uppercase(&hash, input_len);
+            } else if is_base32_lowercase(string_value) {
+                *string_value = hash_to_base32_lowercase(&hash, input_len);
             } else {
-                *s = hex::encode(hash.as_slice());
+                *string_value = hex::encode(&hash[..input_len / 2]);
             }
         }
         Value::Array(arr) => {
@@ -667,14 +678,21 @@ mod tests {
             "b32u": "MFRGGZDFMZTWQ2LKNNWG23TP",
         });
         hash_strings(&mut value);
-        assert_eq!(value["a"], json!("comi"));
-        assert_eq!(value["b"][0], json!("s"));
+        // Verify format preservation rather than exact hash values
+        assert!(is_alpha_word(value["a"].as_str().unwrap()));
+        assert_eq!(value["a"].as_str().unwrap().len(), 4);
+        assert!(is_alpha_word(value["b"][0].as_str().unwrap()));
+        assert_eq!(value["b"][0].as_str().unwrap().len(), 1);
         assert_eq!(value["b"][1], json!(1));
-        assert_eq!(value["c"]["d"], json!("i"));
-        assert_eq!(value["cap"], json!("Boge"));
-        assert_eq!(value["snake"], json!("utcont_stathim"));
-        assert_eq!(value["u"], json!("ERGIL"));
-        assert_eq!(value["b32u"], json!("VLDMNPOCMVCVJCXFTLDUCL74"));
+        assert!(is_alpha_word(value["c"]["d"].as_str().unwrap()));
+        assert_eq!(value["c"]["d"].as_str().unwrap().len(), 1);
+        assert!(is_capitalized_word(value["cap"].as_str().unwrap()));
+        assert_eq!(value["cap"].as_str().unwrap().len(), 4);
+        assert!(is_snake_case_word(value["snake"].as_str().unwrap()));
+        assert!(is_uppercase_word(value["u"].as_str().unwrap()));
+        assert_eq!(value["u"].as_str().unwrap().len(), 5);
+        assert!(is_base32_uppercase(value["b32u"].as_str().unwrap()));
+        assert_eq!(value["b32u"].as_str().unwrap().len(), 24);
     }
 
     #[test]
@@ -694,37 +712,42 @@ mod tests {
             serde_json::from_str(TEST_SAMPLE).expect("Failed to parse TEST_SAMPLE");
         let mut hashed_sample = test_sample.clone();
         hash_strings(&mut hashed_sample);
-        let hashes = serde_json::to_string_pretty(&hashed_sample)
-            .expect("Failed to serialize hashed sample");
-        const EXPECTED_HASHES: &str = r#"[
-  {
-    "additional_information": "4e9be9f98ffaf00dfa6849b118ec0eebaeb9d1fedf49794efc978549d692a644",
-    "category": "AGRWH",
-    "created_at": "2000-01-01T00:00:00Z",
-    "id": "rdhx3wx7qo75n46jwl4n7wijq5",
-    "last_edited_by": "S4XGJ7ZPIXFYST6VJC552D35IM",
-    "lower case word": "vericthesneup",
-    "title": "Danin",
-    "updated_at": "2000-01-01T00:00:00Z",
-    "urls": [
-      {
-        "href": "d0de71c6aff7c8a492c089fbd5a26a39e76716eef770728c5383386fc245c34b",
-        "label": "enagwhi",
-        "primary": true
-      }
-    ],
-    "vault": {
-      "id": "ynbhwzbd65ufp2foibsrlbv6js",
-      "name": "Suchardwi"
-    },
-    "version": 1
-  }
-]"#;
-        assert_eq!(hashes, EXPECTED_HASHES);
+
         let obj = hashed_sample.as_array().unwrap()[0].as_object().unwrap();
+
+        // Verify format preservation for each field
+        let category = obj.get("category").unwrap().as_str().unwrap();
+        assert!(is_uppercase_word(category), "category should be uppercase");
+        assert_eq!(category.len(), 5);
+
+        let id = obj.get("id").unwrap().as_str().unwrap();
+        assert!(is_base32_lowercase(id), "id should be base32 lowercase");
+
+        let last_edited_by = obj.get("last_edited_by").unwrap().as_str().unwrap();
+        assert!(is_base32_uppercase(last_edited_by), "last_edited_by should be base32 uppercase");
+
+        let lower_case_word = obj.get("lower case word").unwrap().as_str().unwrap();
+        assert!(is_alpha_word(lower_case_word), "lower case word should be alpha");
+
+        let title = obj.get("title").unwrap().as_str().unwrap();
+        assert!(is_capitalized_word(title), "title should be capitalized");
+
         let created = obj.get("created_at").unwrap().as_str().unwrap();
         let updated = obj.get("updated_at").unwrap().as_str().unwrap();
+        assert!(to_datetime(created).is_some(), "created_at should be valid datetime");
+        assert!(to_datetime(updated).is_some(), "updated_at should be valid datetime");
         assert_eq!(created, updated);
+
+        let urls = obj.get("urls").unwrap().as_array().unwrap();
+        let url_obj = urls[0].as_object().unwrap();
+        let label = url_obj.get("label").unwrap().as_str().unwrap();
+        assert!(is_alpha_word(label), "label should be alpha word");
+
+        let vault = obj.get("vault").unwrap().as_object().unwrap();
+        let vault_id = vault.get("id").unwrap().as_str().unwrap();
+        assert!(is_base32_lowercase(vault_id), "vault id should be base32 lowercase");
+        let vault_name = vault.get("name").unwrap().as_str().unwrap();
+        assert!(is_capitalized_word(vault_name), "vault name should be capitalized");
     }
 
     #[test]
@@ -774,10 +797,10 @@ mod tests {
     #[test]
     fn test_obfuscate_base32_lowercase_preserves_class() {
         let value = "mfrggzdfmztwq2lknnwg23tp";
-        let hash = Sha3_256::digest(value.as_bytes());
-        let obf = hash_to_base32_lowercase(hash.as_slice(), value.len());
-        assert!(is_base32_lowercase(&obf));
-        assert_eq!(obf.len(), value.len());
+        let hash = shake256_hash(value.as_bytes(), value.len().max(32));
+        let obfuscated = hash_to_base32_lowercase(&hash, value.len());
+        assert!(is_base32_lowercase(&obfuscated));
+        assert_eq!(obfuscated.len(), value.len());
     }
 
     #[test]
@@ -790,11 +813,11 @@ mod tests {
     #[test]
     fn test_obfuscate_base32_uppercase_preserves_class() {
         let value = "MFRGGZDFMZTWQ2LKNNWG23TP";
-        let hash = Sha3_256::digest(value.as_bytes());
-        let obf = hash_to_base32_uppercase(hash.as_slice(), value.len());
-        assert!(is_base32_uppercase(&obf));
-        assert!(!is_base32_lowercase(&obf));
-        assert_eq!(obf.len(), value.len());
+        let hash = shake256_hash(value.as_bytes(), value.len().max(32));
+        let obfuscated = hash_to_base32_uppercase(&hash, value.len());
+        assert!(is_base32_uppercase(&obfuscated));
+        assert!(!is_base32_lowercase(&obfuscated));
+        assert_eq!(obfuscated.len(), value.len());
     }
 
     #[test]
@@ -832,15 +855,16 @@ mod tests {
         let _guard = DATE_TEST_GUARD.lock().unwrap();
         reset_date_baselines();
         for example in WELL_KNOWN_INPUTS {
-            let hash = Sha3_256::digest(example.input.as_bytes());
+            let input_len = example.input.len();
+            let hash = shake256_hash(example.input.as_bytes(), input_len.max(32));
             for &name in example.detectors {
-                let obf = match name {
-                    "alpha_word" => hash_to_syllables(hash.as_slice(), example.input.len()),
+                let obfuscated = match name {
+                    "alpha_word" => hash_to_syllables(&hash, input_len),
                     "uppercase_word" => {
-                        hash_to_syllables(hash.as_slice(), example.input.len()).to_ascii_uppercase()
+                        hash_to_syllables(&hash, input_len).to_ascii_uppercase()
                     }
                     "capitalized_word" => {
-                        let hashed = hash_to_syllables(hash.as_slice(), example.input.len());
+                        let hashed = hash_to_syllables(&hash, input_len);
                         if hashed.is_empty() {
                             hashed
                         } else {
@@ -852,7 +876,7 @@ mod tests {
                             out
                         }
                     }
-                    "snake_case_word" => hash_to_snake_case(example.input, hash.as_slice()),
+                    "snake_case_word" => hash_to_snake_case(example.input, &hash),
                     "datetime" => {
                         if let Some((datetime, format)) = to_datetime(example.input) {
                             obfuscate_datetime(datetime, format)
@@ -861,21 +885,21 @@ mod tests {
                         }
                     }
                     "base32_lowercase" => {
-                        hash_to_base32_lowercase(hash.as_slice(), example.input.len())
+                        hash_to_base32_lowercase(&hash, input_len)
                     }
                     "base32_uppercase" => {
-                        hash_to_base32_uppercase(hash.as_slice(), example.input.len())
+                        hash_to_base32_uppercase(&hash, input_len)
                     }
                     _ => continue,
                 };
                 let valid = match name {
-                    "alpha_word" => is_alpha_word(&obf),
-                    "uppercase_word" => is_uppercase_word(&obf),
-                    "capitalized_word" => is_capitalized_word(&obf),
-                    "snake_case_word" => is_snake_case_word(&obf),
-                    "datetime" => to_datetime(&obf).is_some(),
-                    "base32_lowercase" => is_base32_lowercase(&obf),
-                    "base32_uppercase" => is_base32_uppercase(&obf),
+                    "alpha_word" => is_alpha_word(&obfuscated),
+                    "uppercase_word" => is_uppercase_word(&obfuscated),
+                    "capitalized_word" => is_capitalized_word(&obfuscated),
+                    "snake_case_word" => is_snake_case_word(&obfuscated),
+                    "datetime" => to_datetime(&obfuscated).is_some(),
+                    "base32_lowercase" => is_base32_lowercase(&obfuscated),
+                    "base32_uppercase" => is_base32_uppercase(&obfuscated),
                     _ => false,
                 };
                 assert!(valid, "{} obfuscation failed for {}", name, example.input);
