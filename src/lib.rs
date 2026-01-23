@@ -7,9 +7,9 @@ use serde_json::{Deserializer, Value};
 use sha3::{Digest, Sha3_256};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
-use std::sync::RwLock;
 #[cfg(test)]
 use std::sync::Mutex;
+use std::sync::RwLock;
 
 /// Syllables used for obfuscating lowercase words.
 pub(crate) const SYLLABLES: &[&str] = &[
@@ -35,9 +35,7 @@ pub(crate) const SYLLABLES: &[&str] = &[
 ];
 
 /// Common TLDs used for obfuscating email addresses.
-pub(crate) const COMMON_TLDS: &[&str] = &[
-    "com", "org", "net", "edu", "gov", "io", "co", "info"
-];
+pub(crate) const COMMON_TLDS: &[&str] = &["com", "org", "net", "edu", "gov", "io", "co", "info"];
 
 /// Detects whether the provided string is composed entirely of ASCII lowercase
 /// letters.
@@ -99,7 +97,8 @@ pub(crate) fn is_base32_uppercase(input: &str) -> bool {
 }
 
 lazy_static! {
-    static ref EMAIL_RE: Regex = Regex::new(r"^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap();
+    static ref EMAIL_RE: Regex =
+        Regex::new(r"^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap();
 }
 
 /// Detects whether the provided string is a valid email address.
@@ -160,8 +159,12 @@ lazy_static! {
 
 #[cfg(test)]
 pub(crate) fn set_date_baselines(new_base: DateTime<Utc>) {
-    *NEW_DATE_BASELINE.write().expect("failed to write NEW_DATE_BASELINE") = new_base;
-    *ORIGINAL_DATE_BASELINE.write().expect("failed to write ORIGINAL_DATE_BASELINE") = None;
+    *NEW_DATE_BASELINE
+        .write()
+        .expect("failed to write NEW_DATE_BASELINE") = new_base;
+    *ORIGINAL_DATE_BASELINE
+        .write()
+        .expect("failed to write ORIGINAL_DATE_BASELINE") = None;
 }
 
 /// Attempts to parse a datetime string and returns the parsed datetime
@@ -199,7 +202,9 @@ pub(crate) fn to_datetime(input: &str) -> Option<(DateTime<FixedOffset>, &'stati
     // Try T + Z format with fractional seconds: "2025-12-29T13:18:43.470Z"
     if input.ends_with('Z') && input.contains('.') {
         let with_offset = input.replace('Z', "+00:00");
-        if let Ok(parsed_datetime) = DateTime::parse_from_str(&with_offset, "%Y-%m-%dT%H:%M:%S%.f%z") {
+        if let Ok(parsed_datetime) =
+            DateTime::parse_from_str(&with_offset, "%Y-%m-%dT%H:%M:%S%.f%z")
+        {
             // Count decimal places to determine output format
             if let Some(dot_pos) = input.rfind('.') {
                 let decimal_part = &input[dot_pos + 1..input.len() - 1]; // -1 to exclude 'Z'
@@ -249,7 +254,10 @@ pub(crate) fn to_datetime(input: &str) -> Option<(DateTime<FixedOffset>, &'stati
 
 /// Obfuscate a datetime by shifting it relative to runtime baselines.
 /// The resulting value preserves the exact format of the input.
-pub(crate) fn obfuscate_datetime(parsed_datetime: DateTime<FixedOffset>, output_format: &str) -> String {
+pub(crate) fn obfuscate_datetime(
+    parsed_datetime: DateTime<FixedOffset>,
+    output_format: &str,
+) -> String {
     // Extract the original timezone offset for later preservation
     let original_offset = *parsed_datetime.offset();
 
@@ -593,11 +601,12 @@ mod tests {
         let input = b"0a0b";
         let s = String::from_utf8_lossy(input);
         let trimmed: String = s.chars().filter(|c| !c.is_whitespace()).collect();
-        let bytes = if trimmed.len().is_multiple_of(2) && trimmed.chars().all(|c| c.is_ascii_hexdigit()) {
-            hex::decode(&trimmed).unwrap()
-        } else {
-            input.to_vec()
-        };
+        let bytes =
+            if trimmed.len().is_multiple_of(2) && trimmed.chars().all(|c| c.is_ascii_hexdigit()) {
+                hex::decode(&trimmed).unwrap()
+            } else {
+                input.to_vec()
+            };
         assert_eq!(bytes, vec![0x0a, 0x0b]);
         assert_eq!(
             bytes_to_syllables(&bytes),
@@ -867,21 +876,31 @@ mod tests {
     fn test_to_datetime_when_offset_format_should_return_datetime_and_format() {
         let (datetime, format) = to_datetime("2025-10-02 17:41:16+00:00").expect("should parse");
         assert_eq!(format, "%Y-%m-%d %H:%M:%S%:z");
-        assert_eq!(datetime.format(format).to_string(), "2025-10-02 17:41:16+00:00");
+        assert_eq!(
+            datetime.format(format).to_string(),
+            "2025-10-02 17:41:16+00:00"
+        );
     }
 
     #[test]
     fn test_to_datetime_when_microseconds_format_should_return_datetime_and_format() {
-        let (datetime, format) = to_datetime("2025-12-29 13:18:43.470684+00:00").expect("should parse");
+        let (datetime, format) =
+            to_datetime("2025-12-29 13:18:43.470684+00:00").expect("should parse");
         assert_eq!(format, "%Y-%m-%d %H:%M:%S%.6f%:z");
-        assert_eq!(datetime.format(format).to_string(), "2025-12-29 13:18:43.470684+00:00");
+        assert_eq!(
+            datetime.format(format).to_string(),
+            "2025-12-29 13:18:43.470684+00:00"
+        );
     }
 
     #[test]
     fn test_to_datetime_when_t_z_milliseconds_format_should_return_datetime_and_format() {
         let (datetime, format) = to_datetime("2025-12-29T13:18:43.470Z").expect("should parse");
         assert_eq!(format, "%Y-%m-%dT%H:%M:%S%.3fZ");
-        assert_eq!(datetime.format(format).to_string(), "2025-12-29T13:18:43.470Z");
+        assert_eq!(
+            datetime.format(format).to_string(),
+            "2025-12-29T13:18:43.470Z"
+        );
     }
 
     #[test]

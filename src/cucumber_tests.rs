@@ -38,10 +38,10 @@ async fn i_obfuscate_it(world: &mut TestWorld, detector: String) {
         "base32_lowercase" => crate::hash_to_base32_lowercase(hash.as_slice(), world.input.len()),
         "base32_uppercase" => crate::hash_to_base32_uppercase(hash.as_slice(), world.input.len()),
         "datetime" => {
-            let _guard = crate::DATE_TEST_GUARD.lock().expect("failed to lock DATE_TEST_GUARD");
-            crate::set_date_baselines(
-                chrono::Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap()
-            );
+            let _guard = crate::DATE_TEST_GUARD
+                .lock()
+                .expect("failed to lock DATE_TEST_GUARD");
+            crate::set_date_baselines(chrono::Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap());
             if let Some((datetime, format)) = crate::to_datetime(&world.input) {
                 crate::obfuscate_datetime(datetime, format)
             } else {
