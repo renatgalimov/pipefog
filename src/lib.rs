@@ -251,7 +251,7 @@ pub(crate) fn to_datetime(input: &str) -> Option<(DateTime<FixedOffset>, &'stati
 /// The resulting value preserves the exact format of the input.
 pub(crate) fn obfuscate_datetime(parsed_datetime: DateTime<FixedOffset>, output_format: &str) -> String {
     // Extract the original timezone offset for later preservation
-    let original_offset = parsed_datetime.offset().clone();
+    let original_offset = *parsed_datetime.offset();
 
     // Convert to UTC for baseline calculation
     let datetime_utc = parsed_datetime.with_timezone(&Utc);
@@ -502,7 +502,7 @@ fn humanise() -> io::Result<()> {
     let s = String::from_utf8_lossy(&buf);
     let trimmed: String = s.chars().filter(|c| !c.is_whitespace()).collect();
     let bytes = if !trimmed.is_empty()
-        && trimmed.len() % 2 == 0
+        && trimmed.len().is_multiple_of(2)
         && trimmed.chars().all(|c| c.is_ascii_hexdigit())
     {
         hex::decode(&trimmed).unwrap_or(buf)
@@ -593,7 +593,7 @@ mod tests {
         let input = b"0a0b";
         let s = String::from_utf8_lossy(input);
         let trimmed: String = s.chars().filter(|c| !c.is_whitespace()).collect();
-        let bytes = if trimmed.len() % 2 == 0 && trimmed.chars().all(|c| c.is_ascii_hexdigit()) {
+        let bytes = if trimmed.len().is_multiple_of(2) && trimmed.chars().all(|c| c.is_ascii_hexdigit()) {
             hex::decode(&trimmed).unwrap()
         } else {
             input.to_vec()
