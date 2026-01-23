@@ -34,6 +34,11 @@ pub(crate) const SYLLABLES: &[&str] = &[
     "o", "in", "er", "i", "a", "y", "the", "e",
 ];
 
+/// Common TLDs used for obfuscating email addresses.
+pub(crate) const COMMON_TLDS: &[&str] = &[
+    "com", "org", "net", "edu", "gov", "io", "co", "info"
+];
+
 /// Detects whether the provided string is composed entirely of ASCII lowercase
 /// letters.
 ///
@@ -91,6 +96,16 @@ pub(crate) fn is_base32_lowercase(input: &str) -> bool {
 /// length greater than 16 characters.
 pub(crate) fn is_base32_uppercase(input: &str) -> bool {
     input.len() > 16 && input.chars().all(|c| matches!(c, 'A'..='Z' | '2'..='7'))
+}
+
+lazy_static! {
+    static ref EMAIL_RE: Regex = Regex::new(r"^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap();
+}
+
+/// Detects whether the provided string is a valid email address.
+/// Uses a simple regex pattern that matches common email formats.
+pub(crate) fn is_email(input: &str) -> bool {
+    EMAIL_RE.is_match(input)
 }
 
 /// Split a word into approximate English syllables using the same logic as the
@@ -278,7 +293,9 @@ fn hash_strings(value: &mut Value) {
     match value {
         Value::String(s) => {
             let hash = Sha3_256::digest(s.as_bytes());
-            if is_alpha_word(s) {
+            if is_email(s) {
+                *s = hash_to_email(hash.as_slice());
+            } else if is_alpha_word(s) {
                 *s = hash_to_syllables(hash.as_slice(), s.len());
             } else if is_snake_case_word(s) {
                 *s = hash_to_snake_case(s, hash.as_slice());
@@ -411,6 +428,28 @@ pub(crate) fn hash_to_base32_uppercase(hash: &[u8], len: usize) -> String {
         }
         out
     }
+}
+
+/// Converts a hash into a realistic-looking email address using syllables + hex digits.
+/// Format: syllables+hex@syllables+hex.tld
+pub(crate) fn hash_to_email(hash: &[u8]) -> String {
+    let hash_len = hash.len();
+
+    // Local part: syllables (5 chars) + hex digits (2 chars)
+    let local_syllables = hash_to_syllables(&hash[0..8], 5);
+    let local_hex = format!("{:02x}", hash[8]);
+    let local_part = format!("{}{}", local_syllables, local_hex);
+
+    // Domain part: syllables (6 chars) + hex digits (2 chars)
+    let domain_syllables = hash_to_syllables(&hash[10..18], 6);
+    let domain_hex = format!("{:02x}", hash[18]);
+    let domain_part = format!("{}{}", domain_syllables, domain_hex);
+
+    // TLD: choose from common TLDs using last byte
+    let tld_index = hash[hash_len - 1] as usize % COMMON_TLDS.len();
+    let tld = COMMON_TLDS[tld_index];
+
+    format!("{}@{}.{}", local_part, domain_part, tld)
 }
 
 fn bytes_to_syllables(bytes: &[u8]) -> String {
