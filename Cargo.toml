@@ -2,6 +2,11 @@
 name = "pipefog"
 version = "0.1.0"
 edition = "2021"
+description = "Stream-structured data obfuscator for JSON/YAML."
+license = "MIT"
+repository = "https://github.com/renatgalimov/pipefog"
+homepage = "https://github.com/renatgalimov/pipefog"
+documentation = "https://docs.rs/pipefog"
 
 [dependencies]
 sha3 = "0.10.*"
