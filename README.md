@@ -1,3 +1,4 @@
+[![Crates.io](https://img.shields.io/crates/v/pipefog.svg)](https://crates.io/crates/pipefog)
 [![Rust Tests](https://github.com/renatgalimov/pipefog/actions/workflows/tests.yml/badge.svg)](https://github.com/renatgalimov/pipefog/actions/workflows/tests.yml)
 [![Lint](https://github.com/renatgalimov/pipefog/actions/workflows/lint.yml/badge.svg)](https://github.com/renatgalimov/pipefog/actions/workflows/lint.yml)
 [![Coverage](https://github.com/renatgalimov/pipefog/actions/workflows/coverage.yml/badge.svg)](https://github.com/renatgalimov/pipefog/actions/workflows/coverage.yml)
