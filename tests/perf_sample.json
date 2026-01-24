@@ -1,0 +1,24 @@
+[
+  {
+    "id": "ehatv5afkscpijfhcdiwk2vgk5",
+    "title": "Title",
+    "lower case word": "lowercaseword",
+    "version": 1,
+    "vault": {
+      "id": "ymmcavajzclbbyvnn6pmghw52n",
+      "name": "Vaultname"
+    },
+    "category": "LOGIN",
+    "last_edited_by": "LIS57PQOMZYK6YIAH6DN35JBCR",
+    "created_at": "2025-05-07T11:58:32Z",
+    "updated_at": "2025-05-07T11:58:32Z",
+    "additional_information": "-",
+    "urls": [
+      {
+        "label": "website",
+        "primary": true,
+        "href": "https://example.com/accounts/6d407c4c7578c31bdbe1dce529476c1a/signInPassword"
+      }
+    ]
+  }
+]

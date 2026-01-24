@@ -35,6 +35,20 @@ cat secrets.json | jq . | pipefog | jq .
 original baseline. Every subsequent datetime is shifted relative to these baselines so the output
 remains a valid ISO 8601 `Z` datetime while preserving relative differences.
 
+## Performance
+
+<!-- perf-begin -->
+Benchmark input: `tests/perf_sample.json` (200 iterations).
+
+| Version | Total time (ms) |
+| --- | ---: |
+| (pending) | 0.00 |
+| (pending) | 0.00 |
+| Change | 0.00% |
+
+Last updated: 1970-01-01 00:00 UTC
+<!-- perf-end -->
+
 ## 🏗️ Architecture
 
 This project documents its system architecture using Mermaid diagrams, which GitHub renders natively.
