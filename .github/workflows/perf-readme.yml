@@ -17,7 +17,7 @@ jobs:
       PERF_ITERATIONS: "200"
     steps:
       - name: Checkout main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: main
           fetch-depth: 0
@@ -71,7 +71,7 @@ jobs:
             --iterations "${PERF_ITERATIONS}"
 
       - name: Create pull request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           commit-message: "Update performance benchmarks"
           title: "Update performance benchmarks"
