@@ -20,6 +20,7 @@ jobs:
       - name: Sync Cargo.toml version to tag
         run: |
           tag_version="${GITHUB_REF_NAME#v}"
+          export TAG_VERSION="$tag_version"
           python3 - <<'PY'
           import os
           import re
@@ -38,8 +39,6 @@ jobs:
             raise SystemExit("Cargo.toml version not updated; tag version may be invalid.")
           cargo_toml.write_text(updated, encoding="utf-8")
           PY
-        env:
-          TAG_VERSION: ${{ github.ref_name }}
 
       - name: Publish crate
         env:
