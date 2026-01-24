@@ -1,4 +1,6 @@
 [![Rust Tests](https://github.com/renatgalimov/pipefog/actions/workflows/tests.yml/badge.svg)](https://github.com/renatgalimov/pipefog/actions/workflows/tests.yml)
+[![Lint](https://github.com/renatgalimov/pipefog/actions/workflows/lint.yml/badge.svg)](https://github.com/renatgalimov/pipefog/actions/workflows/lint.yml)
+[![Coverage](https://github.com/renatgalimov/pipefog/actions/workflows/coverage.yml/badge.svg)](https://github.com/renatgalimov/pipefog/actions/workflows/coverage.yml)
 ----
 
 <img width="1280" height="640" alt="pipefog-social" src="https://github.com/user-attachments/assets/a210fa94-fe76-49c3-9b14-7d21bd2c4281" />
