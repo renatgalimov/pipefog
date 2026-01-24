@@ -1,8 +1,8 @@
 [package]
 name = "pipefog"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
-description = "Stream-structured data obfuscator for JSON/YAML."
+description = "Stream-structured data obfuscator for JSON/YAML/CSS."
 license = "MIT"
 repository = "https://github.com/renatgalimov/pipefog"
 homepage = "https://github.com/renatgalimov/pipefog"
