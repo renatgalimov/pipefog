@@ -18,9 +18,7 @@ async fn i_obfuscate_it(world: &mut TestWorld, detector: String) {
     let hash = crate::shake256_hash(world.input.as_bytes(), input_len.max(32));
     world.obfuscated = match detector.as_str() {
         "alpha_word" => crate::hash_to_syllables(&hash, input_len),
-        "uppercase_word" => {
-            crate::hash_to_syllables(&hash, input_len).to_ascii_uppercase()
-        }
+        "uppercase_word" => crate::hash_to_syllables(&hash, input_len).to_ascii_uppercase(),
         "capitalized_word" => {
             let hashed = crate::hash_to_syllables(&hash, input_len);
             if hashed.is_empty() {

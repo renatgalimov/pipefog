@@ -4,7 +4,10 @@ use lazy_static::lazy_static;
 use rand::Rng;
 use regex::Regex;
 use serde_json::{Deserializer, Value};
-use sha3::{Shake256, digest::{Update, ExtendableOutput, XofReader}};
+use sha3::{
+    digest::{ExtendableOutput, Update, XofReader},
+    Shake256,
+};
 use std::collections::HashMap;
 
 /// Computes a SHAKE256 hash of the input and returns the requested number of bytes.
@@ -724,18 +727,30 @@ mod tests {
         assert!(is_base32_lowercase(id), "id should be base32 lowercase");
 
         let last_edited_by = obj.get("last_edited_by").unwrap().as_str().unwrap();
-        assert!(is_base32_uppercase(last_edited_by), "last_edited_by should be base32 uppercase");
+        assert!(
+            is_base32_uppercase(last_edited_by),
+            "last_edited_by should be base32 uppercase"
+        );
 
         let lower_case_word = obj.get("lower case word").unwrap().as_str().unwrap();
-        assert!(is_alpha_word(lower_case_word), "lower case word should be alpha");
+        assert!(
+            is_alpha_word(lower_case_word),
+            "lower case word should be alpha"
+        );
 
         let title = obj.get("title").unwrap().as_str().unwrap();
         assert!(is_capitalized_word(title), "title should be capitalized");
 
         let created = obj.get("created_at").unwrap().as_str().unwrap();
         let updated = obj.get("updated_at").unwrap().as_str().unwrap();
-        assert!(to_datetime(created).is_some(), "created_at should be valid datetime");
-        assert!(to_datetime(updated).is_some(), "updated_at should be valid datetime");
+        assert!(
+            to_datetime(created).is_some(),
+            "created_at should be valid datetime"
+        );
+        assert!(
+            to_datetime(updated).is_some(),
+            "updated_at should be valid datetime"
+        );
         assert_eq!(created, updated);
 
         let urls = obj.get("urls").unwrap().as_array().unwrap();
@@ -745,9 +760,15 @@ mod tests {
 
         let vault = obj.get("vault").unwrap().as_object().unwrap();
         let vault_id = vault.get("id").unwrap().as_str().unwrap();
-        assert!(is_base32_lowercase(vault_id), "vault id should be base32 lowercase");
+        assert!(
+            is_base32_lowercase(vault_id),
+            "vault id should be base32 lowercase"
+        );
         let vault_name = vault.get("name").unwrap().as_str().unwrap();
-        assert!(is_capitalized_word(vault_name), "vault name should be capitalized");
+        assert!(
+            is_capitalized_word(vault_name),
+            "vault name should be capitalized"
+        );
     }
 
     #[test]
@@ -860,9 +881,7 @@ mod tests {
             for &name in example.detectors {
                 let obfuscated = match name {
                     "alpha_word" => hash_to_syllables(&hash, input_len),
-                    "uppercase_word" => {
-                        hash_to_syllables(&hash, input_len).to_ascii_uppercase()
-                    }
+                    "uppercase_word" => hash_to_syllables(&hash, input_len).to_ascii_uppercase(),
                     "capitalized_word" => {
                         let hashed = hash_to_syllables(&hash, input_len);
                         if hashed.is_empty() {
@@ -884,12 +903,8 @@ mod tests {
                             panic!("Failed to parse datetime: {}", example.input);
                         }
                     }
-                    "base32_lowercase" => {
-                        hash_to_base32_lowercase(&hash, input_len)
-                    }
-                    "base32_uppercase" => {
-                        hash_to_base32_uppercase(&hash, input_len)
-                    }
+                    "base32_lowercase" => hash_to_base32_lowercase(&hash, input_len),
+                    "base32_uppercase" => hash_to_base32_uppercase(&hash, input_len),
                     _ => continue,
                 };
                 let valid = match name {
