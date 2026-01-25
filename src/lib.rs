@@ -535,6 +535,23 @@ fn default_mode() -> io::Result<()> {
     Ok(())
 }
 
+/// Obfuscates JSON input bytes and returns formatted output bytes.
+/// Invalid JSON fragments are ignored without error.
+pub fn obfuscate_json_bytes(input: &[u8]) -> io::Result<Vec<u8>> {
+    let stream = Deserializer::from_slice(input).into_iter::<Value>();
+    let mut output = Vec::new();
+
+    for value in stream {
+        if let Ok(mut val) = value {
+            hash_strings(&mut val);
+            serde_json::to_writer_pretty(&mut output, &val)?;
+            output.write_all(b"\n")?;
+        }
+    }
+
+    Ok(output)
+}
+
 fn humanise() -> io::Result<()> {
     let mut buf = Vec::new();
     io::stdin().read_to_end(&mut buf)?;
