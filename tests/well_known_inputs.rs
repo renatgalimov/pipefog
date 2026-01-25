@@ -33,11 +33,19 @@ pub const WELL_KNOWN_INPUTS: &[Example] = &[
         detectors: &["datetime"],
     },
     Example {
+        input: "2026-01-25 14:30:00-0500",
+        detectors: &["datetime"],
+    },
+    Example {
         input: "2025-12-29 13:18:43.470684+00:00",
         detectors: &["datetime"],
     },
     Example {
         input: "2025-12-29T13:18:43.470Z",
+        detectors: &["datetime"],
+    },
+    Example {
+        input: "2026-01-25T14:30:00.123456-0500",
         detectors: &["datetime"],
     },
     Example {

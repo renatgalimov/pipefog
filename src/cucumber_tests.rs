@@ -51,8 +51,8 @@ async fn i_obfuscate_it(world: &mut TestWorld, detector: String) {
     };
 }
 
-#[then(regex = r#"^the result is a valid (\w+)$"#)]
-async fn the_result_is(world: &mut TestWorld, detector: String) {
+#[then(regex = r#"^the result is a valid (\w+) and equals \"([^\"]+)\"$"#)]
+async fn the_result_is(world: &mut TestWorld, detector: String, expected: String) {
     let valid = match detector.as_str() {
         "alpha_word" => crate::is_alpha_word(&world.obfuscated),
         "uppercase_word" => crate::is_uppercase_word(&world.obfuscated),
@@ -65,6 +65,7 @@ async fn the_result_is(world: &mut TestWorld, detector: String) {
         _ => false,
     };
     assert!(valid, "{} obfuscation failed", detector);
+    assert_eq!(world.obfuscated, expected, "unexpected obfuscated output");
 }
 
 #[tokio::test]

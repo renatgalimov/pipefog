@@ -187,7 +187,15 @@ pub(crate) fn to_datetime(input: &str) -> Option<(DateTime<FixedOffset>, &'stati
     // Try space + offset + microseconds format: "2025-12-29 13:18:43.470684+00:00"
     if input.contains('.') {
         if let Ok(parsed_datetime) = DateTime::parse_from_str(input, "%Y-%m-%d %H:%M:%S%.f%z") {
-            let output_format = "%Y-%m-%d %H:%M:%S%.6f%:z";
+            let has_colon_offset = input
+                .rfind(|c| c == '+' || c == '-')
+                .map(|pos| input[pos..].contains(':'))
+                .unwrap_or(false);
+            let output_format = if has_colon_offset {
+                "%Y-%m-%d %H:%M:%S%.6f%:z"
+            } else {
+                "%Y-%m-%d %H:%M:%S%.6f%z"
+            };
             let formatted = parsed_datetime.format(output_format).to_string();
             assert!(
                 formatted == input,
@@ -201,7 +209,15 @@ pub(crate) fn to_datetime(input: &str) -> Option<(DateTime<FixedOffset>, &'stati
 
     // Try space + offset format: "2025-10-02 17:41:16+00:00"
     if let Ok(parsed_datetime) = DateTime::parse_from_str(input, "%Y-%m-%d %H:%M:%S%z") {
-        let output_format = "%Y-%m-%d %H:%M:%S%:z";
+        let has_colon_offset = input
+            .rfind(|c| c == '+' || c == '-')
+            .map(|pos| input[pos..].contains(':'))
+            .unwrap_or(false);
+        let output_format = if has_colon_offset {
+            "%Y-%m-%d %H:%M:%S%:z"
+        } else {
+            "%Y-%m-%d %H:%M:%S%z"
+        };
         let formatted = parsed_datetime.format(output_format).to_string();
         assert!(
             formatted == input,
@@ -238,6 +254,36 @@ pub(crate) fn to_datetime(input: &str) -> Option<(DateTime<FixedOffset>, &'stati
                     formatted
                 );
                 return Some((parsed_datetime, output_format));
+            }
+        }
+    }
+
+    // Try T + offset format with fractional seconds: "2026-01-25T14:30:00.123456-0500"
+    if input.contains('T') && input.contains('.') && !input.ends_with('Z') {
+        if let Some(offset_pos) = input.rfind(|c| c == '+' || c == '-') {
+            if let Ok(parsed_datetime) = DateTime::parse_from_str(input, "%Y-%m-%dT%H:%M:%S%.f%z")
+            {
+                if let Some(dot_pos) = input.rfind('.') {
+                    let decimal_part = &input[dot_pos + 1..offset_pos];
+                    let precision = decimal_part.len();
+                    let has_colon_offset = input[offset_pos..].contains(':');
+                    let output_format = match (precision, has_colon_offset) {
+                        (3, true) => "%Y-%m-%dT%H:%M:%S%.3f%:z",
+                        (3, false) => "%Y-%m-%dT%H:%M:%S%.3f%z",
+                        (6, true) => "%Y-%m-%dT%H:%M:%S%.6f%:z",
+                        (6, false) => "%Y-%m-%dT%H:%M:%S%.6f%z",
+                        (_, true) => "%Y-%m-%dT%H:%M:%S%.f%:z",
+                        (_, false) => "%Y-%m-%dT%H:%M:%S%.f%z",
+                    };
+                    let formatted = parsed_datetime.format(output_format).to_string();
+                    assert!(
+                        formatted == input,
+                        "Round-trip formatting failed for T+offset+fractional format: input='{}', formatted='{}'",
+                        input,
+                        formatted
+                    );
+                    return Some((parsed_datetime, output_format));
+                }
             }
         }
     }
@@ -957,6 +1003,16 @@ mod tests {
     }
 
     #[test]
+    fn test_to_datetime_when_offset_format_without_colon_should_return_datetime_and_format() {
+        let (datetime, format) = to_datetime("2026-01-25 14:30:00-0500").expect("should parse");
+        assert_eq!(format, "%Y-%m-%d %H:%M:%S%z");
+        assert_eq!(
+            datetime.format(format).to_string(),
+            "2026-01-25 14:30:00-0500"
+        );
+    }
+
+    #[test]
     fn test_to_datetime_when_microseconds_format_should_return_datetime_and_format() {
         let (datetime, format) =
             to_datetime("2025-12-29 13:18:43.470684+00:00").expect("should parse");
@@ -1035,4 +1091,5 @@ mod tests {
 
         assert_eq!(obfuscated, "2000-01-01T00:00:00.000Z");
     }
+
 }
