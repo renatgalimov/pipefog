@@ -28,12 +28,19 @@ cat secrets.json | jq . | pipefog | jq .
 - 📏 Length-preserving – Output matches input length by default, at the cost of reduced entropy.
 - 🧩 Supports JSON and YAML – Auto-detects format or allow override with --format.
 - 🛠️ Composable CLI – Works seamlessly in pipelines with jq, yq, and other Unix tools.
-- 🗓️ ISO 8601 datetime obfuscation – Shifts dates relative to runtime baselines while preserving format.
+- 🗓️ Datetime obfuscation – Shifts dates relative to runtime baselines while preserving format.
 
-`pipefog` detects datetimes in the `YYYY-MM-DDTHH:MM:SSZ` form. A random baseline between
-1970-01-01 and the current date is chosen at startup. The first encountered datetime sets an
-original baseline. Every subsequent datetime is shifted relative to these baselines so the output
-remains a valid ISO 8601 `Z` datetime while preserving relative differences.
+`pipefog` detects datetimes in several common ISO 8601-style forms, including:
+- `YYYY-MM-DDTHH:MM:SSZ` (Zulu)
+- `YYYY-MM-DDTHH:MM:SS.sssZ` and `YYYY-MM-DDTHH:MM:SS.ssssssZ`
+- `YYYY-MM-DD HH:MM:SS±HH:MM` (space + offset)
+- `YYYY-MM-DD HH:MM:SS±HHMM` (space + offset, no colon)
+- `YYYY-MM-DD HH:MM:SS.ssssss±HH:MM` (space + offset + microseconds)
+- `YYYY-MM-DDTHH:MM:SS.ssssss±HHMM` (T + offset + microseconds)
+
+A random baseline between 1970-01-01 and the current date is chosen at startup. The first
+encountered datetime sets an original baseline. Every subsequent datetime is shifted relative to
+these baselines so the output remains a valid datetime while preserving relative differences.
 
 ## Performance
 
@@ -65,7 +72,7 @@ graph TD
     D2 -->|uppercase_word| H2["hash→syllables→upper"]
     D2 -->|capitalized_word| H3["hash→syllables→capitalized"]
     D2 -->|snake_case_word| H4["hash→snake_case"]
-    D2 -->|iso8601_z_datetime| H5["obfuscate_iso8601_z_datetime"]
+    D2 -->|datetime| H5["obfuscate_datetime"]
     D2 -->|base32_lowercase| H6["hash→base32_lower"]
     D2 -->|base32_uppercase| H7["hash→base32_upper"]
     D2 -->|no match| H8["hex encode hash"]
