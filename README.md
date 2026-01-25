@@ -42,11 +42,11 @@ Benchmark input: `tests/perf_sample.json` (200 iterations).
 
 | Version | Total time (ms) |
 | --- | ---: |
-| (pending) | 0.00 |
-| (pending) | 0.00 |
-| Change | 0.00% |
+| v0.0.3 | 6.10 |
+| v0.0.2 | 6.23 |
+| Change | -2.09% |
 
-Last updated: 1970-01-01 00:00 UTC
+Last updated: 2026-01-25 02:51 UTC
 <!-- perf-end -->
 
 ## 🏗️ Architecture
