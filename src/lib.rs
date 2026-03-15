@@ -126,7 +126,7 @@ pub(crate) fn is_email(input: &str) -> bool {
 /// Requires at least two labels separated by dots, with an alphabetic TLD of 2+ chars.
 /// Each label may contain alphanumeric characters and hyphens (not at start/end).
 pub(crate) fn is_fqdn(input: &str) -> bool {
-    FQDN_RE.is_match(input) && input.contains('.')
+    FQDN_RE.is_match(input)
 }
 
 /// Split a word into approximate English syllables using the same logic as the
@@ -373,8 +373,8 @@ fn hash_strings(value: &mut Value) {
             if is_email(string_value) {
                 *string_value = hash_to_email(&hash);
             } else if is_fqdn(string_value) {
-                let original = string_value.clone();
-                *string_value = hash_to_fqdn(&hash, &original);
+                let obfuscated = hash_to_fqdn(&hash, string_value.as_str());
+                *string_value = obfuscated;
             } else if is_alpha_word(string_value) {
                 *string_value = hash_to_syllables(&hash, input_len);
             } else if is_snake_case_word(string_value) {
@@ -1151,7 +1151,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hash_to_fqdn_preserves_class() {
+    fn test_hash_to_fqdn_preserves_structure() {
         let inputs = ["example.com", "sub.domain.co.uk", "my-host.example.net"];
         for input in inputs {
             let hash = shake256_hash(input.as_bytes(), input.len().max(32));
@@ -1162,6 +1162,26 @@ mod tests {
                 input,
                 obfuscated
             );
+            let input_labels: Vec<&str> = input.split('.').collect();
+            let output_labels: Vec<&str> = obfuscated.split('.').collect();
+            assert_eq!(
+                input_labels.len(),
+                output_labels.len(),
+                "label count mismatch for '{}'",
+                input
+            );
+            // Non-TLD labels preserve length
+            let non_tld_count = input_labels.len() - 1;
+            for index in 0..non_tld_count {
+                assert_eq!(
+                    input_labels[index].len(),
+                    output_labels[index].len(),
+                    "label length mismatch for '{}': '{}' vs '{}'",
+                    input,
+                    input_labels[index],
+                    output_labels[index]
+                );
+            }
         }
     }
 
