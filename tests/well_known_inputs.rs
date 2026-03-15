@@ -56,4 +56,20 @@ pub const WELL_KNOWN_INPUTS: &[Example] = &[
         input: "MFRGGZDFMZTWQ2LKNNWG23TP",
         detectors: &["base32_uppercase"],
     },
+    Example {
+        input: "example.com",
+        detectors: &["fqdn"],
+    },
+    Example {
+        input: "sub.domain.co.uk",
+        detectors: &["fqdn"],
+    },
+    Example {
+        input: "mail.server.example.org",
+        detectors: &["fqdn"],
+    },
+    Example {
+        input: "my-host.example.net",
+        detectors: &["fqdn"],
+    },
 ];

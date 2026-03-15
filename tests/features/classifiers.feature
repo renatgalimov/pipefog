@@ -32,3 +32,7 @@ Feature: Obfuscation preserves classification
       | email               | user@example.com                                             | ellar30@grethe4f.com                                       |
       | email               | john.doe@company.org                                         | allbe28@estsom7b.info                                      |
       | email               | test-user_123@sub.domain.io                                  | proje69@thatendc.gov                                       |
+      | fqdn                | example.com                                                  | faowner.com                                                |
+      | fqdn                | sub.domain.co.uk                                             | ing.recops.th.io                                           |
+      | fqdn                | mail.server.example.org                                      | vand.cansaa.likettl.edu                                    |
+      | fqdn                | my-host.example.net                                          | elfdenh.ovefnot.co                                         |

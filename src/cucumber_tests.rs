@@ -47,6 +47,7 @@ async fn i_obfuscate_it(world: &mut TestWorld, detector: String) {
             }
         }
         "email" => crate::hash_to_email(&hash),
+        "fqdn" => crate::hash_to_fqdn(&hash, &world.input),
         _ => world.input.clone(),
     };
 }
@@ -62,6 +63,7 @@ async fn the_result_is(world: &mut TestWorld, detector: String, expected: String
         "base32_uppercase" => crate::is_base32_uppercase(&world.obfuscated),
         "datetime" => crate::to_datetime(&world.obfuscated).is_some(),
         "email" => crate::is_email(&world.obfuscated),
+        "fqdn" => crate::is_fqdn(&world.obfuscated),
         _ => false,
     };
     assert!(valid, "{} obfuscation failed", detector);

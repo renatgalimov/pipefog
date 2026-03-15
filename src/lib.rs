@@ -112,12 +112,21 @@ pub(crate) fn is_base32_uppercase(input: &str) -> bool {
 lazy_static! {
     static ref EMAIL_RE: Regex =
         Regex::new(r"^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap();
+    static ref FQDN_RE: Regex =
+        Regex::new(r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$").unwrap();
 }
 
 /// Detects whether the provided string is a valid email address.
 /// Uses a simple regex pattern that matches common email formats.
 pub(crate) fn is_email(input: &str) -> bool {
     EMAIL_RE.is_match(input)
+}
+
+/// Detects whether the provided string is a fully qualified domain name (FQDN).
+/// Requires at least two labels separated by dots, with an alphabetic TLD of 2+ chars.
+/// Each label may contain alphanumeric characters and hyphens (not at start/end).
+pub(crate) fn is_fqdn(input: &str) -> bool {
+    FQDN_RE.is_match(input) && input.contains('.')
 }
 
 /// Split a word into approximate English syllables using the same logic as the
@@ -363,6 +372,9 @@ fn hash_strings(value: &mut Value) {
             let hash = shake256_hash(string_value.as_bytes(), input_len.max(32));
             if is_email(string_value) {
                 *string_value = hash_to_email(&hash);
+            } else if is_fqdn(string_value) {
+                let original = string_value.clone();
+                *string_value = hash_to_fqdn(&hash, &original);
             } else if is_alpha_word(string_value) {
                 *string_value = hash_to_syllables(&hash, input_len);
             } else if is_snake_case_word(string_value) {
@@ -535,6 +547,33 @@ pub(crate) fn hash_to_email(hash: &[u8]) -> String {
     let tld = COMMON_TLDS[tld_index];
 
     format!("{}@{}.{}", local_part, domain_part, tld)
+}
+
+/// Converts a hash into a realistic-looking FQDN preserving the label structure.
+/// Each label in the input is replaced with syllable-based text of the same length.
+/// The TLD is chosen from COMMON_TLDS based on the hash.
+pub(crate) fn hash_to_fqdn(hash: &[u8], input: &str) -> String {
+    let labels: Vec<&str> = input.split('.').collect();
+    let label_count = labels.len();
+
+    // TLD: choose from common TLDs using last byte
+    let tld_index = hash[hash.len() - 1] as usize % COMMON_TLDS.len();
+    let tld = COMMON_TLDS[tld_index];
+
+    // Generate non-TLD labels from hash slices
+    let mut result_labels = Vec::with_capacity(label_count);
+    let non_tld_count = label_count - 1;
+    for (label_index, label) in labels.iter().enumerate().take(non_tld_count) {
+        let target_len = label.len();
+        let hash_offset = (label_index * 8) % hash.len();
+        let end = (hash_offset + 8).min(hash.len());
+        let label_hash = &hash[hash_offset..end];
+        let generated = hash_to_syllables(label_hash, target_len);
+        result_labels.push(generated);
+    }
+
+    result_labels.push(tld.to_string());
+    result_labels.join(".")
 }
 
 fn bytes_to_syllables(bytes: &[u8]) -> String {
@@ -929,6 +968,9 @@ mod tests {
             if is_base32_uppercase(example.input) {
                 detected.insert("base32_uppercase");
             }
+            if is_fqdn(example.input) {
+                detected.insert("fqdn");
+            }
             let expected: BTreeSet<&str> = example.detectors.iter().copied().collect();
             assert_eq!(detected, expected, "mismatch for input: {}", example.input);
         }
@@ -968,6 +1010,7 @@ mod tests {
                     }
                     "base32_lowercase" => hash_to_base32_lowercase(&hash, input_len),
                     "base32_uppercase" => hash_to_base32_uppercase(&hash, input_len),
+                    "fqdn" => hash_to_fqdn(&hash, example.input),
                     _ => continue,
                 };
                 let valid = match name {
@@ -978,6 +1021,7 @@ mod tests {
                     "datetime" => to_datetime(&obfuscated).is_some(),
                     "base32_lowercase" => is_base32_lowercase(&obfuscated),
                     "base32_uppercase" => is_base32_uppercase(&obfuscated),
+                    "fqdn" => is_fqdn(&obfuscated),
                     _ => false,
                 };
                 assert!(valid, "{} obfuscation failed for {}", name, example.input);
@@ -1090,6 +1134,35 @@ mod tests {
         let obfuscated = obfuscate_datetime(datetime, format);
 
         assert_eq!(obfuscated, "2000-01-01T00:00:00.000Z");
+    }
+
+    #[test]
+    fn test_is_fqdn_examples() {
+        assert!(is_fqdn("example.com"));
+        assert!(is_fqdn("sub.domain.co.uk"));
+        assert!(is_fqdn("mail.server.example.org"));
+        assert!(is_fqdn("my-host.example.net"));
+        assert!(!is_fqdn("localhost"));
+        assert!(!is_fqdn("not a domain"));
+        assert!(!is_fqdn("user@example.com"));
+        assert!(!is_fqdn(".example.com"));
+        assert!(!is_fqdn("example."));
+        assert!(!is_fqdn("example.c"));
+    }
+
+    #[test]
+    fn test_hash_to_fqdn_preserves_class() {
+        let inputs = ["example.com", "sub.domain.co.uk", "my-host.example.net"];
+        for input in inputs {
+            let hash = shake256_hash(input.as_bytes(), input.len().max(32));
+            let obfuscated = hash_to_fqdn(&hash, input);
+            assert!(
+                is_fqdn(&obfuscated),
+                "obfuscated '{}' -> '{}' is not a valid FQDN",
+                input,
+                obfuscated
+            );
+        }
     }
 
 }
