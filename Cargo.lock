@@ -797,6 +797,7 @@ name = "pipefog"
 version = "0.0.1"
 dependencies = [
  "chrono",
+ "clap",
  "cucumber",
  "data-encoding",
  "hex",
