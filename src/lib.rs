@@ -163,8 +163,8 @@ pub(crate) fn rough_english_syllables(word: &str) -> Vec<String> {
 
 fn random_date_between_1970_and_now() -> DateTime<Utc> {
     let end = Utc::now().timestamp();
-    let mut rng = rand::thread_rng();
-    let secs = rng.gen_range(0..=end);
+    let mut rng = rand::rng();
+    let secs = rng.random_range(0..=end);
     Utc.timestamp_opt(secs, 0).single().unwrap()
 }
 
@@ -197,7 +197,7 @@ pub(crate) fn to_datetime(input: &str) -> Option<(DateTime<FixedOffset>, &'stati
     if input.contains('.') {
         if let Ok(parsed_datetime) = DateTime::parse_from_str(input, "%Y-%m-%d %H:%M:%S%.f%z") {
             let has_colon_offset = input
-                .rfind(|c| c == '+' || c == '-')
+                .rfind(['+', '-'])
                 .map(|pos| input[pos..].contains(':'))
                 .unwrap_or(false);
             let output_format = if has_colon_offset {
@@ -219,7 +219,7 @@ pub(crate) fn to_datetime(input: &str) -> Option<(DateTime<FixedOffset>, &'stati
     // Try space + offset format: "2025-10-02 17:41:16+00:00"
     if let Ok(parsed_datetime) = DateTime::parse_from_str(input, "%Y-%m-%d %H:%M:%S%z") {
         let has_colon_offset = input
-            .rfind(|c| c == '+' || c == '-')
+            .rfind(['+', '-'])
             .map(|pos| input[pos..].contains(':'))
             .unwrap_or(false);
         let output_format = if has_colon_offset {
@@ -269,9 +269,8 @@ pub(crate) fn to_datetime(input: &str) -> Option<(DateTime<FixedOffset>, &'stati
 
     // Try T + offset format with fractional seconds: "2026-01-25T14:30:00.123456-0500"
     if input.contains('T') && input.contains('.') && !input.ends_with('Z') {
-        if let Some(offset_pos) = input.rfind(|c| c == '+' || c == '-') {
-            if let Ok(parsed_datetime) = DateTime::parse_from_str(input, "%Y-%m-%dT%H:%M:%S%.f%z")
-            {
+        if let Some(offset_pos) = input.rfind(['+', '-']) {
+            if let Ok(parsed_datetime) = DateTime::parse_from_str(input, "%Y-%m-%dT%H:%M:%S%.f%z") {
                 if let Some(dot_pos) = input.rfind('.') {
                     let decimal_part = &input[dot_pos + 1..offset_pos];
                     let precision = decimal_part.len();
@@ -549,9 +548,10 @@ pub(crate) fn hash_to_email(hash: &[u8]) -> String {
     format!("{}@{}.{}", local_part, domain_part, tld)
 }
 
-/// Converts a hash into a realistic-looking FQDN preserving the label structure.
-/// Each label in the input is replaced with syllable-based text of the same length.
-/// The TLD is chosen from COMMON_TLDS based on the hash.
+/// Converts a hash into a realistic-looking FQDN preserving the label count and
+/// the byte length of every non-TLD label. The final label (TLD) is replaced
+/// with an entry from `COMMON_TLDS` chosen by the hash, so the TLD length is
+/// NOT preserved.
 pub(crate) fn hash_to_fqdn(hash: &[u8], input: &str) -> String {
     let labels: Vec<&str> = input.split('.').collect();
     let label_count = labels.len();
@@ -626,12 +626,10 @@ pub fn obfuscate_json_bytes(input: &[u8]) -> io::Result<Vec<u8>> {
     let stream = Deserializer::from_slice(input).into_iter::<Value>();
     let mut output = Vec::new();
 
-    for value in stream {
-        if let Ok(mut val) = value {
-            hash_strings(&mut val);
-            serde_json::to_writer_pretty(&mut output, &val)?;
-            output.write_all(b"\n")?;
-        }
+    for mut parsed_value in stream.flatten() {
+        hash_strings(&mut parsed_value);
+        serde_json::to_writer_pretty(&mut output, &parsed_value)?;
+        output.write_all(b"\n")?;
     }
 
     Ok(output)
@@ -1184,5 +1182,4 @@ mod tests {
             }
         }
     }
-
 }
